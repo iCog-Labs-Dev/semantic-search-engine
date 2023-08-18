@@ -1,0 +1,1 @@
+slack_data_path = "/content/slackdata/"
