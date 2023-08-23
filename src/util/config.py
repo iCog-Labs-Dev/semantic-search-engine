@@ -1,1 +1,1 @@
-slack_data_path = "/content/slackdata/"
+slack_data_path = "./src/database/slackdata/"

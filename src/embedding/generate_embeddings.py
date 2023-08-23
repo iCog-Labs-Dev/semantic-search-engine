@@ -2,6 +2,9 @@ import requests
 import ast
 import os
 
+from environment import *
+
+
 url = os.environ["EMBEDDING_URL"] 
 embedding_model_url = os.environ["EMBEDDING_MODEL_SPACE_LINK"] 
 

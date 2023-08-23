@@ -1,6 +1,7 @@
 import os
 import pandas as pd
-from config import *
+from src.util.config import *
+
 def get_all_channels(path):
   df = pd.read_json(path + 'channels.json')
 
