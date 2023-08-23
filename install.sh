@@ -1,9 +1,8 @@
+# To download the slack exports from github
 pip install gitpython
-#Install dependencies for Llama 2
-pip -q install git+https://github.com/huggingface/transformers # need to install transformers from github
-pip install -q datasets loralib sentencepiece
-pip -q install bitsandbytes accelerate xformers einops
-# Install Instructor Embedding and Chroma
-pip -q install langchain chromadb sentence_transformers InstructorEmbedding
-# Install ngrok to host an api endpoint from colab
-pip install pyngrok
+# To use the vector db locally
+pip -q install langchain chromadb
+# To create an API
+pip install flask flask-cors
+# To get a hosted instance of LLaMA2 70B
+pip -q install --upgrade together
