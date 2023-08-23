@@ -1,14 +1,31 @@
-from InstructorEmbedding import INSTRUCTOR
-from langchain.embeddings import HuggingFaceInstructEmbeddings
+import requests
+import ast
+import os
 
-
-
-# Load the embedding model
-instructor_embeddings = HuggingFaceInstructEmbeddings(model_name="hkunlp/instructor-xl",
-                                                      model_kwargs={"device": "cuda"})
-
+url = os.environ["EMBEDDING_URL"] 
+embedding_model_url = os.environ["EMBEDDING_MODEL_SPACE_LINK"] 
 
 # Get the list of embeddings for all messages in a channel
 def embed_channel_messages(channel_messages):
   msg_list = channel_messages.astype(str).tolist()
-  return instructor_embeddings.embed_documents(msg_list)
+  post_data = {
+            'link': embedding_model_url ,
+            # 'query': "['hi','hello']"
+            'query': str(msg_list)
+          }
+
+  embeddings = requests.post(url, data = post_data, headers = {"Content-Type": "application/x-www-form-urlencoded"})
+
+  return ast.literal_eval(embeddings.text)
+
+# Get the corresponding embedding for the user's query
+def embed_query(query):
+  post_data = {
+            'link': embedding_model_url ,
+            # 'query': "['hi','hello']"
+            'query': str([query])
+          }
+
+  embeddings = requests.post(url, data = post_data, headers = {"Content-Type": "application/x-www-form-urlencoded"}, timeout=120)
+
+  return ast.literal_eval(embeddings.text)[0]
