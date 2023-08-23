@@ -6,7 +6,7 @@ from ..util.config import *
 import math
 
 
-client = chromadb.PersistentClient(path="/content/chroma_db")
+client = chromadb.PersistentClient(path="./chroma_db")
 
 
 # Get a collection object from an existing collection, by name. If it doesn't exist, create one.
