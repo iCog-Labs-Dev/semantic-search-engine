@@ -3,6 +3,7 @@ from ..util.get_channels import *
 from ..util.extract_channel_metadata import *
 from ..embedding.generate_embeddings import *
 from ..util.config import *
+import math
 
 
 client = chromadb.PersistentClient(path="/content/chroma_db")
@@ -34,39 +35,42 @@ def upsert_channel_embeddings(channel_name, channel_embeddings, channel_metadata
   print(collection.peek()) # returns a list of the first 10 items in the collection
   print(collection.count()) # returns the number of items in the collection
 
-# Upsert every channel's data into the vector db
-def upsert_all_channels():
-  channel_names = channels['channel_name'].tolist()
-  for channel_name in channel_names:
-    print('Upserting ' + channel_name + ' ... ')
+step = 15
 
-    channel_metadata = extract_channel_metadata(slack_data_path, channel_name)
+# Upsert channel's data to the vector db
+def upsert_channels(channel_names=[]):
+  if (channel_names == []):
+    channel_names = channels['channel_name'].tolist()
 
-    if (not channel_metadata.empty):
+  for idx, ch_name in enumerate(channel_names):
+    print(f'Upserting channel { str(idx+1) } of { str(len(channel_names)) }: "{ch_name}" ... ')
 
-      channel_embeddings = embed_channel_messages(channel_metadata['message'])
+    channel_metadata = extract_channel_metadata(slack_data_path, ch_name)
 
-      upsert_channel_embeddings(channel_name, channel_embeddings, channel_metadata)
+    if (channel_metadata.empty):
+      print('-> The channel is empty / doesn\'t exist!')
+      continue
 
-# Upsert just one channel's data
-def upsert_one_channel(channel_name):
-  print('Upserting ' + channel_name + ' ... ')
+    no_messages = len(channel_metadata)
 
-  channel_metadata = extract_channel_metadata(slack_data_path, channel_name)
+    for start in range(0, no_messages, step):
 
-  if (not channel_metadata.empty):
+      end = min(no_messages, start+step)
+      channel_metadata_batch = channel_metadata[start:end]
 
-    channel_embeddings = embed_channel_messages(channel_metadata['message'])
+      print(f'-> Embedding Batch { math.ceil(end/step) }/{ math.ceil(no_messages/step) } ...')
+      # print(str(channel_metadata_batch['message']))
 
-    upsert_channel_embeddings(channel_name, channel_embeddings, channel_metadata)
-upsert_all_channels()
-# upsert_one_channel('random')  # general, random, gptgenerated
+      channel_embeddings = embed_channel_messages(channel_metadata_batch['message'])
 
+      upsert_channel_embeddings(channel_embeddings[start:end], channel_metadata_batch)
+
+# upsert_channels() # upsert all channels
 
 
 def get_data_from_chroma(query):
   # Generate embeddings for the query
-  embedded_query = instructor_embeddings.embed_query(query)
+  embedded_query = embed_query(query)
 
   query_response = collection.query(
       query_embeddings = embedded_query,
@@ -92,5 +96,5 @@ def get_data_from_chroma(query):
   return {'context': context, 'metadata': metadatas}
 
 # get_data_from_chroma("Why was it good work?")
-get_data_from_chroma("What did Tollan say was good work?")
+# get_data_from_chroma("What did Tollan say was good work?")
 # get_data_from_chroma("What are some models that are comparable to GPT 3?")
