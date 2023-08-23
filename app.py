@@ -1,5 +1,11 @@
 from flask import Flask, request
+from flask_cors import CORS
 from src.LLM.methods import *
+import os
+
+os.environ["TOGETHER_API_KEY"] = "ac17a88fb15afc19f632fc58d39d177814f3ead1d013f7adc9bce9f3ccf33580"
+os.environ["NGROK_AUTH_TOKEN"] = "2UKtqNC7pDrDKG272UqIOy4rvSm_2ezkSxzZ7LDUBey1S2dM6"
+
 port_no = 5000
 
 app = Flask(__name__)
@@ -15,6 +21,6 @@ def semantic_search_query():
   elif request.method == 'POST':
     query = request.json['query']
     return semantic_search(query)
-print("Server running....")
-
+  
+print(f"Server running on port {port_no}....")
 app.run(port=port_no)
