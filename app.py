@@ -1,14 +1,9 @@
 from flask import Flask, request
 from flask_cors import CORS
 from src.llm.semantic_search import SemanticSearch as s
-# from src.database.chroma import *
 from environment import *
 
 port_no = 5000
-
-
-
-# upsert_channels(['random', 'general'])
 
 app = Flask(__name__)
 
