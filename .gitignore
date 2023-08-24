@@ -1,2 +1,4 @@
 __pycache__
 .venv
+environment.py
+chroma_db/
