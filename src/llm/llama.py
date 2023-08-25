@@ -10,8 +10,6 @@ from langchain.llms.base import LLM
 from langchain.llms.utils import enforce_stop_tokens
 from langchain.utils import get_from_dict_or_env
 
-from environment import *
-
 import os
 
 class TogetherLLM(LLM):
@@ -20,7 +18,7 @@ class TogetherLLM(LLM):
     model: str = "togethercomputer/llama-2-70b-chat"
     """model endpoint to use"""
 
-    together_api_key: str = os.environ["TOGETHER_API_KEY"]
+    together_api_key: str = '-------------------'
     """Together API key"""
 
     temperature: float = 0.7
@@ -38,11 +36,21 @@ class TogetherLLM(LLM):
     
     def start_model(self):
         # Start the llama2 70B model
-        together.Models.start(self.model)
+        try:
+            together.api_key = self.together_api_key
+            together.Models.start(self.model)
+        except:
+            return 'Failed to start model!'
+        return 'Model started!'
     
     def stop_model(self):
         # Stop the llama2 70B model
-        together.Models.stop(self.model)
+        try:
+            together.api_key = self.together_api_key
+            together.Models.stop(self.model)
+        except:
+            return 'Failed to stop model!'
+        return 'Model stopped!'
 
     @root_validator()
     def validate_environment(cls, values: Dict) -> Dict:
@@ -65,11 +73,17 @@ class TogetherLLM(LLM):
     ) -> str:
         """Call to Together endpoint."""
         together.api_key = self.together_api_key
-        output = together.Complete.create(prompt,
-                                          model=self.model,
-                                          max_tokens=self.max_tokens,
-                                          temperature=self.temperature,
-                                          )
-        text = output['output']['choices'][0]['text']
+        try:
+            output = together.Complete.create(prompt,
+                                            model=self.model,
+                                            max_tokens=self.max_tokens,
+                                            temperature=self.temperature,
+                                            )
+            text = output['output']['choices'][0]['text']
+        except together.error.InstanceError:
+            return f'The model "{ self.model }" is not running on together.ai'
+        except:
+            return 'An error occurred!'
+        
         return text
 

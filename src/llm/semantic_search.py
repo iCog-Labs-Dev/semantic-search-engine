@@ -3,6 +3,7 @@ from src.llm.prompt import Prompt
 from src.llm.llama import TogetherLLM
 from src.database.slack.slack import Slack
 from src.database.chroma import Chroma
+from src.embedding.embedding import Embedding
 
 class SemanticSearch:
 
@@ -11,7 +12,7 @@ class SemanticSearch:
     #     If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information.\
     # """
 
-    def semantic_search(query):
+    def semantic_search(query, api_key, model_name, embedding_model_hf, embedding_api_url):
 
         prompt = Prompt(
             system_prompt = """\
@@ -31,7 +32,8 @@ class SemanticSearch:
 
         # llm = HuggingFacePipeline(pipeline = pipe, model_kwargs = {'temperature':0})
         llm = TogetherLLM(
-            model= "togethercomputer/llama-2-70b-chat",
+            model= model_name,
+            together_api_key=api_key,
             temperature=0.1,
             max_tokens=512
         )
@@ -42,9 +44,15 @@ class SemanticSearch:
 
         chroma_collection = chroma_db.get_collection("slack_collection")
 
+        embedding = Embedding(
+            embedding_model_hf = embedding_model_hf,
+            embedding_api_url = embedding_api_url
+        )
+
         slack = Slack(
             collection=chroma_collection,
-            slack_data_path="./src/database/slackdata/"
+            slack_data_path="./src/database/slackdata/",
+            embedding=embedding
         )
 
         search_prompt = prompt.get_prompt()
