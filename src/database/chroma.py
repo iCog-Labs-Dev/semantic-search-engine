@@ -15,3 +15,8 @@ class Chroma:
       # embedding_function= instructor_embeddings     # The default embedding model is 'all-MiniLM-L6-V2'
     )
     return collection
+
+  def delete_collection(self, collection_name):
+    client = chromadb.PersistentClient(self.path)
+    
+    client.delete_collection(name=collection_name)
