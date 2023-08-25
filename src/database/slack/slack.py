@@ -2,14 +2,13 @@ import json
 import math
 from src.database.crud import CRUD as chroma
 from src.database.slack.extract_data import ExtractData as extract
-from src.database.slack.pull_from_repo import FetchFromRepo
-from src.embedding.embedding import Embedding
 
 class Slack:
 
-    def __init__(self, collection, slack_data_path):
+    def __init__(self, collection, slack_data_path, embedding):
         self.collection = collection
-        self.slack_data_path = slack_data_path
+        self.slack_data_path = slack_data_path,
+        self.embedding = embedding
     
 
     # This will fetch the metadata from the slack archive (passing an empty array will fetch all channels' metadata)
@@ -41,7 +40,7 @@ class Slack:
 
     def upsert_channel(self, channel_metadata_batch):
     
-            channel_embeddings = Embedding.embed_channel_messages(channel_metadata_batch['message'])
+            channel_embeddings = self.embedding.embed_channel_messages(channel_metadata_batch['message'])
 
             parsed_channel_metadata = json.loads(channel_metadata_batch.to_json(orient="records")) # parse the channel metadata to json
 
@@ -56,7 +55,7 @@ class Slack:
 
     def get_data_from_chroma(self, query, num_results, condition={}):
         print('Embedding query ...', end=' ')
-        embedded_query = Embedding().embed_query(query)
+        embedded_query = self.embedding.embed_query(query)
         print('Done!')
         query_response = chroma.retrieve(self.collection, embedded_query, num_results, condition)
         # documents = query_response['documents']
