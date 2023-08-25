@@ -10,7 +10,6 @@ app = Flask(__name__)
 
 @app.route("/", methods=['GET', 'POST'])
 def semantic_search_query():
-
   if request.method == 'GET':
     # query = request.args.get('query')
     return 'Send a POST request!'
@@ -30,33 +29,22 @@ def semantic_search_query():
       embedding_api_url=embedding_api_url
       )
 
-@app.route("/start-model", methods=['GET', 'POST'])
-def start_model():
-  if request.method == 'GET':
-    # api_key = request.args.get('api_key')
-    # llm = request.args.get['llm']
-    return '<h4> Send a POST request with: "together_api_key" & "model_name" </h4>'
-
-  elif request.method == 'POST':
-    api_key = request.json['together_api_key']
-    model = request.json['model_name']
-    return TogetherLLM(
-      together_api_key=api_key,
-      model=model
-    ).start_model()
-
-@app.route("/stop-model", methods=['GET', 'POST'])
-def stop_model():
+@app.route("/togetherai/<action>", methods=['GET', 'POST'])
+def start_model(action):
   if request.method == 'GET':
     return '<h4> Send a POST request with: "together_api_key" & "model_name" </h4>'
 
   elif request.method == 'POST':
+    # action = request.args.get('action')
     api_key = request.json['together_api_key']
     model = request.json['model_name']
-    return TogetherLLM(
+
+    together = TogetherLLM(
       together_api_key=api_key,
       model=model
-    ).stop_model()
+    )
+
+    return together.start_model() if action=='start' else together.stop_model()
 
 
 print(f"Server running on port {port_no}....")
