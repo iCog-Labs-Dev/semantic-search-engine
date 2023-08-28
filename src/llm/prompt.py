@@ -39,12 +39,14 @@ class Prompt:
         # print(template)
 
         prompt = PromptTemplate(
-            input_variables=["context", "chat_history", "user_input"], template=template
+            # input_variables=["context", "chat_history", "user_input"], template=template
+            input_variables=["context", "user_input"], template=template
         )
 
         return prompt
     
     # This is the history of every prompt given to the chain (Can be used as chat history)
     def get_buffer_memory(self):
-        memory = ConversationBufferMemory(memory_key="chat_history", input_key="user_input")
+        # memory = ConversationBufferMemory(memory_key="chat_history", input_key="user_input")
+        memory = ConversationBufferMemory(input_key="user_input")
         return memory

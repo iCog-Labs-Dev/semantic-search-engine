@@ -10,6 +10,7 @@ class Embedding:
   # Get the list of embeddings for all messages in a channel
   def embed_channel_messages(self, channel_messages):
     msg_list = channel_messages.astype(str).tolist()
+
     post_data = {
               'link': self.embedding_model_hf ,
               # 'query': "['hi','hello']"
