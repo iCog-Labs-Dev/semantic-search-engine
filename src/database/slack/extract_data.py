@@ -4,10 +4,15 @@ import pandas as pd
 # from src.database.slack.pull_from_repo import FetchFromRepo
 
 class ExtractData:
-    # Return the metadata of each message in the channel
-    def extract_channel_metadata(path, channel_name):
 
-        daily_json_files = glob.glob(path + channel_name +'/*.json')  # use glob to get all the json files in the folder
+    def __init__(self, slack_data_path):
+        self.slack_data_path = slack_data_path
+
+
+    # Return the metadata of each message in the channel
+    def extract_channel_metadata(self, channel_name):
+
+        daily_json_files = glob.glob(self.slack_data_path + channel_name + '/*.json')  # use glob to get all the json files in the folder
 
         if not daily_json_files:  # return if the channel doesn't exist (or hasn't been exported yet)
             return
@@ -31,22 +36,22 @@ class ExtractData:
                     # TODO: filter out any links, stickers, and other junk
                     # TODO: replace @Member references with their real names
 
-            metadata.loc[len(metadata)] = {
-                    'message': msg_data['user_profile']['first_name'] + ': ' + msg_data['text'],
-                    'channel': channel_name,
-                    'date': today_date.split(".json")[0], # omit the file extension '.json'
-                    'time': msg_data['ts'],
-                    'user_id': msg_data['user'],
-                    'user_name': msg_data['user_profile']['real_name'] # We can use 'first_name' to get the first name and 'real_name' to get the full name of the user
-            }
+                metadata.loc[len(metadata)] = {
+                        'message': msg_data['user_profile']['first_name'] + ': ' + msg_data['text'],
+                        'channel': channel_name,
+                        'date': today_date.split(".json")[0], # omit the file extension '.json'
+                        'time': msg_data['ts'],
+                        'user_id': msg_data['user'],
+                        'user_name': msg_data['user_profile']['real_name'] # We can use 'first_name' to get the first name and 'real_name' to get the full name of the user
+                }
 
         return metadata
 
     # extract_channel_metadata(slack_data_path, 'test')
 
 
-    def get_all_channels(path):
-        df = pd.read_json(path + 'channels.json')
+    def get_all_channels(self):
+        df = pd.read_json(self.slack_data_path + 'channels.json')
 
         channel_ids = [id for id in df['id']]
         channel_names = [ name for name in df['name']]

@@ -20,3 +20,5 @@ class Chroma:
     client = chromadb.PersistentClient(self.path)
     
     client.delete_collection(name=collection_name)
+
+    return 'Successfully deleted: ' + collection_name
