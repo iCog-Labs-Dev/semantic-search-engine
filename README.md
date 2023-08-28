@@ -1,7 +1,7 @@
 # Semaintic Search Engine
 
 This repo contains an API for semantically searching exported slack data. The API has the following endpoints:
->**URL:** https://semantic-search.onrender.com
+>**URL:** https://semantic-search.onrender.com/ (not deployed yet). You can use https://localhost:5000/ for now.
 >**Note:** All `GET` requests show the structure of the `POST` requests you should be sending.
 -  **Root endpoint** `/` : Get some documentation about the endpoints
 -  **Pull endpoint** `/pull` : Pull / clone the repo containing the exported slack data
@@ -14,7 +14,14 @@ This repo contains an API for semantically searching exported slack data. The AP
 ### It's best to follow these steps if you are running the API for the first time.
 >**Prerequisite:** You should have your own together.ai API key
 
-#### 1. Pulling Slack data from GitHub
+#### 1. Installing required dependencies
+* Run the following commands on the root directory:
+```sh
+{
+    ./install.sh && python3 app.py
+}
+```
+#### 2. Pulling Slack data from GitHub
 * **URL:** `/pull`
 * **Method:** `POST`
 ```sh
@@ -22,7 +29,7 @@ This repo contains an API for semantically searching exported slack data. The AP
     "repo_url": "https://github.com/iCog-Labs-Dev/slack-export-data.git"
 }
 ```
-#### 2. Upserting Slack data to the vector database
+#### 3. Upserting Slack data to the vector database
 * **URL:** `/upsert`
 * **Method:** `POST`
 ```sh
@@ -30,7 +37,7 @@ This repo contains an API for semantically searching exported slack data. The AP
     "channel_names": "['random', 'test', 'general']"
 }
 ```
-#### 3. Starting the model on together.ai
+#### 4. Starting the model on together.ai
 * **URL:** `/togetherai/start`
 * **Method:** `POST`
 ```sh
@@ -38,7 +45,7 @@ This repo contains an API for semantically searching exported slack data. The AP
 	"together_api_key": "---------------------------"
 }
 ```
-#### 4. Prompting the semantic-search-engine
+#### 5. Prompting the semantic-search-engine
 * **URL:** `/search`
 * **Method:** `POST`
 ```sh
@@ -47,7 +54,7 @@ This repo contains an API for semantically searching exported slack data. The AP
 	"together_api_key": "---------------------------"
 }
 ```
-#### 5. Stopping the model on together.ai
+#### 6. Stopping the model on together.ai
 * **URL:** `/togetherai/stop`
 * **Method:** `POST`
 ```sh
