@@ -75,7 +75,7 @@ def pull_or_clone():
   if request.method == 'GET':
     return '''<pre><h4> Send a POST request: <br>
     {
-      "repo_url": "https://github.com/TollanBerhanu/MatterMost-LLM-test-Slack-export-Jun-19-2023---Jun-20-2023.git"
+      "repo_url": "https://github.com/iCog-Labs-Dev/slack-export-data.git"
     }
     </h4></pre>'''
   

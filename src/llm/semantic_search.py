@@ -29,6 +29,8 @@ class SemanticSearch:
                 ### Chat History: \n\n{chat_history} \nHuman: {user_input} \nAssistant:\n \
             """
         )
+        search_prompt = prompt.get_prompt()
+        # memory = prompt.get_buffer_memory()
 
         # llm = HuggingFacePipeline(pipeline = pipe, model_kwargs = {'temperature':0})
         llm = TogetherLLM(
@@ -38,10 +40,17 @@ class SemanticSearch:
             max_tokens=512
         )
 
+        llm_chain = LLMChain(
+            llm=llm,
+            prompt=search_prompt,
+            verbose=False
+            # memory=memory
+        )
+        # llm_chain.predict(context="Alice: What's an LLM? \n Bob: It's an abbreviation for Large Langage Model.", user_input="Hi, my name is Sam")
+
         chroma_db = Chroma(
             path_to_db = "./chroma_db"
         )
-
         chroma_collection = chroma_db.get_collection("slack_collection")
 
         embedding = Embedding(
@@ -55,19 +64,8 @@ class SemanticSearch:
             embedding=embedding
         )
 
-        search_prompt = prompt.get_prompt()
-        memory = prompt.get_buffer_memory()
-
-        llm_chain = LLMChain(
-            llm=llm,
-            prompt=search_prompt,
-            verbose=False,
-            memory=memory,
-        )
-
         context, metadata = slack.get_data_from_chroma(query, num_results=5) # ,condition = { "channel": {"$eq": "general"}, "user_id": {"$in": ["U05D1SQDNSH", "U05DHDPL4FK", "U05CQ93C3FZ", "U05D4M7RGQ3"]} }
 
-        # llm_chain.predict(context="Alice: What's an LLM? \n Bob: It's an abbreviation for Large Langage Model.", user_input="Hi, my name is Sam")
         response = llm_chain.predict(context=context, user_input=query)
 
         return {'response': str(response), 'metadata': metadata}

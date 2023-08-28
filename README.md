@@ -1,18 +1,36 @@
 # Semaintic Search Engine
 
->This repo contains an API for semantically searching exported slack data. The API has the following endpoints:
+This repo contains an API for semantically searching exported slack data. The API has the following endpoints:
+>**URL:** `https://semantic-search.onrender.com`. 
+>**Note:** All `GET` requests show the structure of the `POST` requests you should be sending.
 -  **Root endpoint** `/` : Get some documentation about the endpoints
--  **Root endpoint** `/pull` : Pull / clone the repo containing the exported slack data
--  **Root endpoint** `/upsert` : Upsert exported slack data to the vector database
--  **Root endpoint** `/togetherai/start` : Start running the togeher.ai model
--  **Root endpoint** `/search` : Semantically search the exported slack messages
--  **Root endpoint** `/togetherai/stop` : Stop running the togeher.ai model
+-  **Pull endpoint** `/pull` : Pull / clone the repo containing the exported slack data
+-  **Upsert endpoint** `/upsert` : Upsert exported slack data to the vector database
+-  **Start endpoint** `/togetherai/start` : Start running the togeher.ai model
+-  **Search endpoint** `/search` : Semantically search the exported slack messages
+-  **Stop endpoint** `/togetherai/stop` : Stop running the togeher.ai model
 
-**Note: All `GET` requests to the above URLs show the structure of the `POST` requests you should be sending.**
 
->**It's best to follow these steps if you are running the API for the first time.**
+### It's best to follow these steps if you are running the API for the first time.
+>**Prerequisite:** You should have your own together.ai API key
 
-#### 1. Starting the model on together.ai
+#### 1. Pulling Slack data from GitHub
+* **URL:** `/pull`
+* **Method:** `POST`
+```sh
+{
+    "repo_url": "https://github.com/iCog-Labs-Dev/slack-export-data.git"
+}
+```
+#### 2. Upserting Slack data to the vector database
+* **URL:** `/upsert`
+* **Method:** `POST`
+```sh
+{
+    "channel_names": "['random', 'test', 'general']"
+}
+```
+#### 3. Starting the model on together.ai
 * **URL:** `/togetherai/start`
 * **Method:** `POST`
 ```sh
@@ -21,8 +39,7 @@
 	"model_name": "togethercomputer/llama-2-70b-chat"
 }
 ```
-
-### Prompting the semantic-search-engine
+#### 4. Prompting the semantic-search-engine
 * **URL:** `/search`
 * **Method:** `POST`
 ```sh
@@ -32,5 +49,14 @@
 	"together_model_name": "togethercomputer/llama-2-70b-chat",
 	"embedding_model_hf": "https://huggingface.co/spaces/tollan/instructor-xl",
 	"embedding_api_url": "https://hackingfaces.onrender.com/embed"
+}
+```
+#### 5. Stopping the model on together.ai
+* **URL:** `/togetherai/stop`
+* **Method:** `POST`
+```sh
+{
+	"together_api_key": "---------------------------",
+	"model_name": "togethercomputer/llama-2-70b-chat"
 }
 ```
