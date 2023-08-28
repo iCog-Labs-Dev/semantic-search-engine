@@ -1,7 +1,7 @@
 # Semaintic Search Engine
 
 This repo contains an API for semantically searching exported slack data. The API has the following endpoints:
->**URL:** `https://semantic-search.onrender.com`. 
+>**URL:** https://semantic-search.onrender.com
 >**Note:** All `GET` requests show the structure of the `POST` requests you should be sending.
 -  **Root endpoint** `/` : Get some documentation about the endpoints
 -  **Pull endpoint** `/pull` : Pull / clone the repo containing the exported slack data
@@ -35,8 +35,7 @@ This repo contains an API for semantically searching exported slack data. The AP
 * **Method:** `POST`
 ```sh
 {
-	"together_api_key": "---------------------------",
-	"model_name": "togethercomputer/llama-2-70b-chat"
+	"together_api_key": "---------------------------"
 }
 ```
 #### 4. Prompting the semantic-search-engine
@@ -45,10 +44,7 @@ This repo contains an API for semantically searching exported slack data. The AP
 ```sh
 {
 	"query" : "What did someone say about something?",
-	"together_api_key": "---------------------------",
-	"together_model_name": "togethercomputer/llama-2-70b-chat",
-	"embedding_model_hf": "https://huggingface.co/spaces/tollan/instructor-xl",
-	"embedding_api_url": "https://hackingfaces.onrender.com/embed"
+	"together_api_key": "---------------------------"
 }
 ```
 #### 5. Stopping the model on together.ai
@@ -56,7 +52,6 @@ This repo contains an API for semantically searching exported slack data. The AP
 * **Method:** `POST`
 ```sh
 {
-	"together_api_key": "---------------------------",
-	"model_name": "togethercomputer/llama-2-70b-chat"
+	"together_api_key": "---------------------------"
 }
 ```
