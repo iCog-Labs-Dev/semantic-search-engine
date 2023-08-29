@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # To download the slack exports from github
 pip -q install gitpython
 # To use the vector db locally
