@@ -1,6 +1,6 @@
 from langchain import LLMChain
 from src.llm.prompt import Prompt
-from src.llm.llama import TogetherLLM
+from llm.together_llm import TogetherLLM
 from src.database.slack.slack import Slack
 from src.database.chroma import Chroma
 from src.embedding.embedding import Embedding
