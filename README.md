@@ -6,6 +6,7 @@ This repo contains an API for semantically searching exported slack data. The AP
 -  **Root endpoint** `/` : Get some documentation about the endpoints
 -  **Pull endpoint** `/pull` : Pull / clone the repo containing the exported slack data
 -  **Upsert endpoint** `/upsert` : Upsert exported slack data to the vector database
+-  **Delete endpoint** `/delete_all` : Delete the ChromaDB collection
 -  **Start endpoint** `/togetherai/start` : Start running the togeher.ai model
 -  **Search endpoint** `/search` : Semantically search the exported slack messages
 -  **Stop endpoint** `/togetherai/stop` : Stop running the togeher.ai model
