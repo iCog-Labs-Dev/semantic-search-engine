@@ -18,9 +18,7 @@ This repo contains an API for semantically searching exported slack data. The AP
 #### 1. Installing required dependencies
 * Run the following commands on the root directory:
 ```sh
-{
-    ./install.sh && python3 app.py
-}
+./install.sh && python3 app.py
 ```
 #### 2. Pulling Slack data from GitHub
 * **URL:** `/pull`
