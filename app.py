@@ -3,9 +3,8 @@ from flask_cors import CORS
 from src.utils.app_init import AppInit
 from src.semantic_search import SemanticSearch as s
 import ast
+import os
 
-
-port_no = 5000
 
 app = Flask(__name__)
 
@@ -124,7 +123,8 @@ def reset_vector_db():
         return app_init.chroma().delete_collection(
             collection_name=collection_name
         )
-
+    
+port_no = os.environ.get('PORT', 5000)
 
 print(f"Server running on port {port_no}....")
-app.run(port=port_no)
+app.run(port=int(port_no))
