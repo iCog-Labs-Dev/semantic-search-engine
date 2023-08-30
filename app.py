@@ -127,4 +127,4 @@ def reset_vector_db():
 port_no = os.environ.get('PORT', 5000)
 
 print(f"Server running on port {port_no}....")
-app.run(port=int(port_no))
+# app.run(port=int(port_no))
