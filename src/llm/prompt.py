@@ -1,6 +1,6 @@
 import textwrap
 from langchain import PromptTemplate
-from langchain.memory import ConversationBufferMemory
+# from langchain.memory import ConversationBufferMemory
 
 class Prompt:
     
@@ -46,7 +46,7 @@ class Prompt:
         return prompt
     
     # This is the history of every prompt given to the chain (Can be used as chat history)
-    def get_buffer_memory(self):
+    '''def get_buffer_memory(self):
         # memory = ConversationBufferMemory(memory_key="chat_history", input_key="user_input")
         memory = ConversationBufferMemory(input_key="user_input")
-        return memory
+        return memory'''
