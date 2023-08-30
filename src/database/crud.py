@@ -1,5 +1,4 @@
 import chromadb
-from src.embedding.embedding import Embedding
 
 class CRUD:
 

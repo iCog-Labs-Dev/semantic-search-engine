@@ -1,9 +1,5 @@
 from langchain import LLMChain
-from src.llm.prompt import Prompt
-from src.llm.together_llm import TogetherLLM
 from src.database.slack.slack import Slack
-from src.database.chroma import Chroma
-from src.embedding.embedding import Embedding
 from src.utils.app_init import AppInit
 
 class SemanticSearch:
