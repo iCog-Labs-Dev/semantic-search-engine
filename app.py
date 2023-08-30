@@ -5,12 +5,9 @@ from src.semantic_search import SemanticSearch as s
 import ast
 import os
 
-import importlib
+__import__('pysqlite3')
 import sys
-
-package = importlib.import_module('pysqlite3')
-sys.modules['sqlite3'] = package
-
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 app = Flask(__name__)
 
