@@ -1,4 +1,8 @@
-from InstructorEmbedding import INSTRUCTOR
+'''
+    You can run this to install Instructor-XL embeddings on your local machine.
+'''
+
+# from InstructorEmbedding import INSTRUCTOR    # To import this, you'll first need to run: `pip install -U INSTRUCTOR` 
 from langchain.embeddings import HuggingFaceInstructEmbeddings
 
 

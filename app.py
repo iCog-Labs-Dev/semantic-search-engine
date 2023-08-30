@@ -1,7 +1,7 @@
 from flask import Flask, request
 from flask_cors import CORS
 from src.utils.app_init import AppInit
-from src.llm.semantic_search import SemanticSearch as s
+from src.semantic_search import SemanticSearch as s
 import ast
 
 
@@ -14,18 +14,18 @@ app_init = AppInit()
 # ************************************************************** /
 
 
-@app.route("/", methods=['GET'])
-def semantic_search_query():
+@app.route('/', methods=['GET'])
+def root_route():
     if request.method == 'GET':
         # query = request.args.get('query')
-        return '''<h1>hi✋</h1>'''
+        return '''<h1>Hi ✋</h1>'''
 
 
 # ************************************************************** /search
 
 
-@app.route("/search", methods=['GET', 'POST'])
-def semantic_search_query():
+@app.route('/search', methods=['GET', 'POST'])
+def semantic_search():
     if request.method == 'GET':
         # query = request.args.get('query')
         return '''<pre><h4> Send a POST request: <br>
@@ -46,7 +46,7 @@ def semantic_search_query():
 
 # ************************************************************** /togetherai/<action>
 
-@app.route("/togetherai/<action>", methods=['GET', 'POST'])
+@app.route('/togetherai/<action>', methods=['GET', 'POST'])
 def start_model(action):
     if request.method == 'GET':
         return '''<pre><h4> Send a POST request:<br>
@@ -62,7 +62,7 @@ def start_model(action):
             together_api_key=api_key
         )
 
-        return together.start_model() if action == 'start' else together.stop_model()
+        return together.start_model() if action == 'start' else together.stop_model() if action == 'stop' else "Use routes '/start' or '/stop'"
 
 
 # ************************************************************** /pull

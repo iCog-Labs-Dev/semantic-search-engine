@@ -23,7 +23,7 @@ This repo contains an API for semantically searching exported slack data. The AP
 #### 2. Making sure server is running
 * **URL:** `/`
 * **Method:** `GET`
-* **Method:** `hi✋`
+* **Response:** `Hi ✋`
 
 #### 3. Pulling Slack data from GitHub
 * **URL:** `/pull`

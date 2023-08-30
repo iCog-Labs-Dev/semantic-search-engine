@@ -1,3 +1,7 @@
+'''
+    You can run this to install LLaMA2 7B on your local machine.
+'''
+
 from huggingface_hub import login
 # Use a pipeline for later
 from transformers import pipeline

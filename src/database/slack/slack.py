@@ -32,7 +32,7 @@ class Slack:
             channel_metadata = extract.extract_channel_metadata(ch_name)
 
             if (channel_metadata.empty):
-                print('-> The channel is empty / doesn\'t exist!')
+                print('-> Err: The channel is either empty or it doesn\'t exist!')
                 continue
 
             no_messages = len(channel_metadata)
