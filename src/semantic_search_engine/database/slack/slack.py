@@ -1,7 +1,7 @@
 import json
 import math
-from src.database.crud import CRUD
-from src.database.slack.extract_data import ExtractData
+from semantic_search_engine.database.crud import CRUD
+from semantic_search_engine.database.slack.extract_data import ExtractData
 
 class Slack:
 

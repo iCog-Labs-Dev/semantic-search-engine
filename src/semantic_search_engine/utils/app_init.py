@@ -1,9 +1,9 @@
-from src.database.slack.slack import Slack
-from src.database.chroma import Chroma
-from src.embedding.embedding import Embedding
-from src.llm.together_llm import TogetherLLM
-from src.llm.prompt import Prompt
-from src.database.slack.pull_from_repo import FetchFromRepo
+from semantic_search_engine.database.slack.slack import Slack
+from semantic_search_engine.database.chroma import Chroma
+from semantic_search_engine.embedding.embedding import Embedding
+from semantic_search_engine.llm.together_llm import TogetherLLM
+from semantic_search_engine.llm.prompt import Prompt
+from semantic_search_engine.database.slack.pull_from_repo import FetchFromRepo
 
 class AppInit:
 
