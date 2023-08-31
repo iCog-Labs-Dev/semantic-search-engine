@@ -1,7 +1,8 @@
 # Semaintic Search Engine
 
 This repo contains an API for semantically searching exported slack data. The API has the following endpoints:
->**URL:** https://semantic-search.onrender.com/ (not deployed yet). You can use https://localhost:5000/ for now.
+>**Public URL:** https://semantic-search-79bp.onrender.com
+>**Local URL:** https://localhost:5000/
 >**Note:** All `GET` requests show the structure of the `POST` requests you should be sending.
 -  **Root endpoint** `/` : Get some documentation about the endpoints
 -  **Pull endpoint** `/pull` : Pull / clone the repo containing the exported slack data
@@ -30,7 +31,7 @@ This repo contains an API for semantically searching exported slack data. The AP
 * **Method:** `POST`
 ```sh
 {
-    "repo_url": "https://github.com/iCog-Labs-Dev/slack-export-data.git"
+	"repo_url": "https://github.com/iCog-Labs-Dev/slack-export-data.git"
 }
 ```
 #### 4. Upserting Slack data to the vector database
@@ -38,7 +39,7 @@ This repo contains an API for semantically searching exported slack data. The AP
 * **Method:** `POST`
 ```sh
 {
-    "channel_names": "['random', 'test', 'general']"
+	"channel_names": "['random', 'test', 'general']"
 }
 ```
 #### 5. Starting the model on together.ai
