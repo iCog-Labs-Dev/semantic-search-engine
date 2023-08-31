@@ -16,7 +16,12 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
 ]
+dynamic = ["dependencies"]
+
 
 [project.urls]
 "Homepage" = "https://github.com/iCog-Labs-Dev/semantic-search-engine"
 "Bug Tracker" = "https://github.com/iCog-Labs-Dev/semantic-search-engine/issues"
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
