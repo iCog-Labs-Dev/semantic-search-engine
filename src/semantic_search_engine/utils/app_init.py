@@ -1,9 +1,9 @@
-from src.database.slack.slack import Slack
-from src.database.chroma import Chroma
-from src.embedding.embedding import Embedding
-from src.llm.together_llm import TogetherLLM
-from src.llm.prompt import Prompt
-from src.database.slack.pull_from_repo import FetchFromRepo
+from database.slack.slack import Slack
+from database.chroma import Chroma
+from embedding.embedding import Embedding
+from llm.together_llm import TogetherLLM
+from llm.prompt import Prompt
+from database.slack.pull_from_repo import FetchFromRepo
 
 class AppInit:
 

@@ -1,6 +1,6 @@
 from langchain import LLMChain
-from src.database.slack.slack import Slack
-from src.utils.app_init import AppInit
+from database.slack.slack import Slack
+from utils.app_init import AppInit
 
 class SemanticSearch:
 
