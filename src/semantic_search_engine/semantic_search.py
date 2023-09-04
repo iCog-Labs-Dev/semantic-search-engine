@@ -1,36 +1,27 @@
+from semantic_search_engine.llm import TogetherAI, Llama
+from semantic_search_engine.chroma import ChromaSingleton
 from langchain import LLMChain
-from semantic_search_engine.database.slack.slack import Slack
-from semantic_search_engine.utils.app_init import AppInit
-
 class SemanticSearch:
 
-    # DEFAULT_SYSTEM_PROMPT = """\
-    #     You are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe. Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature.
-    #     If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information.\
-    # """
+    @classmethod
+    def semantic_search(cls, query, api_key):
+        """_summary_
+        Parameters
+        ----------
+        query : str
+            _description_
+        api_key : str
+            _description_
+        """
 
-    def semantic_search(query, api_key):
+        llm = TogetherAI().get_llm()
 
-        app = AppInit()
+        vector_db = ChromaSingleton()
 
-        llm_chain = LLMChain(
-            llm =  app.llm(
-                together_api_key=api_key
-            ),
-            prompt = app.prompt().get_prompt(),
-            verbose = False
-            # memory= app.prompt.get_buffer_memory()
-        )
-        # llm_chain.predict(context="Alice: What's an LLM? \n Bob: It's an abbreviation for Large Langage Model.", user_input="Hi, my name is Sam")
-
-        slack = Slack(
-            collection = app.chroma().get_collection("slack_collection"),
-            slack_data_path = "./src/database/slackdata/",
-            embedding = app.embedding()
-        )
-
-        context, metadata = slack.get_data_from_chroma(query, num_results=5) # ,condition = { "channel": {"$eq": "general"}, "user_id": {"$in": ["U05D1SQDNSH", "U05DHDPL4FK", "U05CQ93C3FZ", "U05D4M7RGQ3"]} }
-
-        response = llm_chain.predict(context=context, user_input=query)
-
-        return {'response': str(response), 'metadata': metadata}
+        chain = LLMChain(
+                llm=llm, 
+                prompt="",
+                # include the necessary output parser
+            )
+        
+        chain.run()
