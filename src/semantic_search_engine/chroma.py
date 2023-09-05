@@ -67,7 +67,7 @@ class ChromaSingleton(metaclass=_ChromaSingletonMeta):
 
         Returns
         -------
-        API
+        chroma.API
             a chroma client (API class)
         """
         if self._connection is None:

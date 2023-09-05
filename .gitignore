@@ -5,3 +5,4 @@ environment.py
 chroma_db/
 slackdata/
 archive/
+.env
