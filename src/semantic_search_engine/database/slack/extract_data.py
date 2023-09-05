@@ -4,13 +4,39 @@ import pandas as pd
 # from src.database.slack.pull_from_repo import FetchFromRepo
 
 class ExtractData:
+    """ 
+    A class for extracting and processsing slack data exported in JSON format.
+    
+    This class provides methods to extract and organize messages metadata from slack channel
+    export files and retrives information about slack channels
+
+
+    Attributes:
+            slack_data_path(str): the path to the directory containg slack data export files
+      """
 
     def __init__(self, slack_data_path):
+        """
+        Initialize a new ExtractData instance.
+
+        Args:
+            slack_data_path (str): The path to the directory containing slack data export files.
+         """
         self.slack_data_path = slack_data_path
 
 
     # Return the metadata of each message in the channel
     def extract_channel_metadata(self, channel_name):
+        """
+        Extracts metadata from slack message in a specific channel.
+
+        Args:
+            channel_name (str): the name of the slack channel to extract metadata from.
+
+        Returns: 
+               pandas.DataFrame: A Dataframe containing message metadata for each message in the channel, 
+               including message content, channel, date, time, user ID, and user name.
+        """
 
         daily_json_files = glob.glob(self.slack_data_path + channel_name + '/*.json')  # use glob to get all the json files in the folder
 
@@ -51,6 +77,12 @@ class ExtractData:
 
 
     def get_all_channels(self):
+        """
+        Retrives information about all slack channels.
+
+        Returns:
+               pandas.DataFrame: A DataFrame containing channel IDs and channel names
+        """
         df = pd.read_json(self.slack_data_path + 'channels.json')
 
         channel_ids = [id for id in df['id']]
