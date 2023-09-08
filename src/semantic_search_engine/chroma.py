@@ -35,9 +35,9 @@ class ChromaSingleton(metaclass=_ChromaSingletonMeta):
     def __init__(
             self,
             use_path : bool = True, 
-            database_path : str = constants.DB_PATH, 
-            host : str = constants.DB_HOST, 
-            port : str = constants.DB_PORT
+            database_path : str = constants.CHROMA_PATH, 
+            host : str = constants.CHROMA_HOST, 
+            port : str = constants.CHROMA_PORT
         ) -> None:
         """Instantiates different parameters required for creating a Chroma client
 
@@ -48,13 +48,13 @@ class ChromaSingleton(metaclass=_ChromaSingletonMeta):
             by default True.
         database_path : str, optional
             the local chroma client path to connect to, only valid if use_path is\
-            true, by default constants.DB_PATH.
+            true, by default constants.CHROMA_PATH.
         host : str, optional
             the remote host address of chroma db,only valid if use_path is false\
-            ,by default constants.DB_HOST
+            ,by default constants.CHROMA_HOST
         port : _type_, optional
             the remote port of chroma db, only valid if use_path is false, by \
-            default constants.DB_PORT
+            default constants.CHROMA_PORT
         """
 
         self.use_path = use_path

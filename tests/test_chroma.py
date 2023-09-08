@@ -64,8 +64,6 @@ class TestChromaSingleton(unittest.TestCase):
         # Wait for all events to be set (indicating thread completion)
         event.wait()
 
-        print(thread_ids)
-
         self.assertNotEqual(len(thread_ids), 0, "multithreading did not work")
         self.assertTrue(all(id == thread_ids[0] for id in thread_ids), "the threads are not similar")
 

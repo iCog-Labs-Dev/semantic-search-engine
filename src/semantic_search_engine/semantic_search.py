@@ -1,6 +1,7 @@
 from chromadb import EmbeddingFunction
 from semantic_search_engine.llm import TogetherLLM
 from semantic_search_engine.chroma import ChromaSingleton
+from semantic_search_engine import constants
 from langchain import LLMChain, PromptTemplate
 from chromadb.utils import embedding_functions
 from langchain.llms.base import LLM
@@ -61,12 +62,12 @@ class SemanticSearch():
         self.collection = ChromaSingleton().\
             get_connection().\
             get_or_create_collection(
-                "messages",
+                constants.CHROMA_COLLECTION,
                 embedding_function= self.embedding_function
             )  # this should ge only get_collection      
 
    
-    def semantic_search(self, query : str, api_key : str = None):
+    def semantic_search(self, query : str, user : str):
         """executes a semantic search on an LLM based on a certain query from a\
         vector db.
 
@@ -83,8 +84,14 @@ class SemanticSearch():
         str
             an explanation of for the query provided by the LLM
         """
+        # TODO : implement the code below with crud
         query_result = self.collection.query(
-            query_texts=[query]
+            query_texts=[query],
+            where = {
+                "chat" : {
+                    "$in" : self.__filter(user)
+                }
+            }
         )
 
         return self.chain.run(
@@ -94,6 +101,25 @@ class SemanticSearch():
                 "query" : query    
             }
         )
+    
+
+    def __filter(self, user_id : str) -> list[str]:
+        """extracts and returns a list of chat ids in which a user is permitted\
+        to view.
+
+        Parameters
+        ----------
+        user_id : str
+            the id of the user making the query
+
+        Returns
+        -------
+        list[str]
+            a list of chat ids a user is permitted to view
+        """
+        # TODO : implement chat filter functionality
+        
+
 
 class SemanticSearchBuilder():
     """A builder pattern class used to build a semantic search
@@ -158,5 +184,11 @@ class SemanticSearchBuilder():
         SemanticSearch
             the built semantic search object
         """
-
+        # update the chain
+        self.chain = LLMChain(
+                llm=self.llm, 
+                prompt=self.prompt_template,
+                # include the necessary output parser
+            )
+        
         return self.ss

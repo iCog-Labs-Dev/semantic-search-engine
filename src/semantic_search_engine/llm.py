@@ -54,3 +54,5 @@ class TogetherLLM(LLM):
             return 'An error occurred!'
         
         return text
+    
+# class Llamma

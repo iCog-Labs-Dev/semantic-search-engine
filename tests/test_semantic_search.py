@@ -56,7 +56,7 @@ class TestSemanticTest(unittest.TestCase):
 
 
     @classmethod
-    def tearDown(self) -> None:
+    def tearDownClass(cls) -> None:
         # remove togetherAI setup
         together.api_key = os.environ.get("TOGETHER_API_KEY")
         together.Models.stop("togethercomputer/llama-2-7b-chat")
@@ -70,10 +70,8 @@ class TestSemanticTest(unittest.TestCase):
 
     
     def test_semantic_search(self):
-        res = self.semantic_search.semantic_search(
-            "why is alice in wonderland?", 
-            "palce_holder"
-        )
+        res = self.semantic_search.semantic_search("who said hello")
+        
         print('-'*50)
         print(res)
         print('-'*50)
@@ -84,6 +82,16 @@ class TestSemanticTest(unittest.TestCase):
 
     def test_dummy(self):
         self.assertEqual(1,1)
+
+class TestSemanticSearchBuilder(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        pass
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        pass
 
 if __name__ == "__main__":
     unittest.main()
