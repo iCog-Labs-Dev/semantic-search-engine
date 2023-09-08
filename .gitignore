@@ -6,3 +6,4 @@ chroma_db/
 slackdata/
 archive/
 .env
+sqlite.db
