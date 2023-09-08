@@ -101,24 +101,6 @@ class SemanticSearch():
                 "query" : query    
             }
         )
-    
-
-    def __filter(self, user_id : str) -> list[str]:
-        """extracts and returns a list of chat ids in which a user is permitted\
-        to view.
-
-        Parameters
-        ----------
-        user_id : str
-            the id of the user making the query
-
-        Returns
-        -------
-        list[str]
-            a list of chat ids a user is permitted to view
-        """
-        # TODO : implement chat filter functionality
-        
 
 
 class SemanticSearchBuilder():
