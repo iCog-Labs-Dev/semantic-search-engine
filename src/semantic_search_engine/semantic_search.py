@@ -67,7 +67,7 @@ class SemanticSearch():
             )  # this should ge only get_collection      
 
    
-    def semantic_search(self, query : str, user : str):
+    def semantic_search(self, query : str, user : str = ""):
         """executes a semantic search on an LLM based on a certain query from a\
         vector db.
 
@@ -87,11 +87,11 @@ class SemanticSearch():
         # TODO : implement the code below with crud
         query_result = self.collection.query(
             query_texts=[query],
-            where = {
-                "chat" : {
-                    "$in" : self.__filter(user)
-                }
-            }
+            # where = {
+            #     "chat" : {
+            #         "$in" : self.__filter(user)
+            #     }
+            # }
         )
 
         return self.chain.run(

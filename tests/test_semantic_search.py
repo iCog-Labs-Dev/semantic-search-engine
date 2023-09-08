@@ -1,7 +1,7 @@
 
 import shutil
 import unittest
-from semantic_search_engine.constants import DB_PATH
+from semantic_search_engine import constants
 from semantic_search_engine.semantic_search import SemanticSearch
 import together
 import os
@@ -63,7 +63,7 @@ class TestSemanticTest(unittest.TestCase):
 
         # remove database setup
         try:
-            shutil.rmtree(DB_PATH)
+            shutil.rmtree(constants.CHROMA_PATH)
         except FileNotFoundError:
             pass
     
