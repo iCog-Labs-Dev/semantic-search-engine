@@ -1,11 +1,10 @@
 from chromadb import EmbeddingFunction
-from semantic_search_engine.llm import TogetherLLM
-from semantic_search_engine.chroma import ChromaSingleton
-from semantic_search_engine import constants
+from src.llm import TogetherLLM
+from src.chroma import ChromaSingleton
+from src import constants
 from langchain import LLMChain, PromptTemplate
 from chromadb.utils import embedding_functions
 from langchain.llms.base import LLM
-import os
 
 class SemanticSearch():
     """The entrypoint to the package that contains the necessary data to 
@@ -67,7 +66,7 @@ class SemanticSearch():
             )  # this should ge only get_collection      
 
    
-    def semantic_search(self, query : str, user : str = ""):
+    def semantic_search(self, query : str):
         """executes a semantic search on an LLM based on a certain query from a\
         vector db.
 
@@ -89,7 +88,7 @@ class SemanticSearch():
             query_texts=[query],
             # where = {
             #     "chat" : {
-            #         "$in" : self.__filter(user)
+            #         "$in" : chat_ids
             #     }
             # }
         )

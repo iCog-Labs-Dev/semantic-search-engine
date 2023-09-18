@@ -4,13 +4,15 @@ from pydantic import Extra, root_validator #, Field
 from langchain.llms.base import LLM
 from langchain.utils import get_from_dict_or_env
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class TogetherLLM(LLM):
     """A custom langchain LLM wrapper for togetherAI
     """
 
     model: str = "togethercomputer/llama-2-70b-chat"
-
     together_api_key: str = os.environ.get("TOGETHER_API_KEY")
 
     temperature: float = 0.7

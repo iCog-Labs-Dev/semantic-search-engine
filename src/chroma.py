@@ -1,5 +1,5 @@
 from threading import Lock, Thread
-from semantic_search_engine import constants
+from src import constants
 import chromadb
 
 class _ChromaSingletonMeta(type):
