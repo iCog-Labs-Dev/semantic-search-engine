@@ -12,6 +12,7 @@ CHROMA_COLLECTION = os.environ.get("SS_CHROMA_COLLECTION_NAME") or "messages"
 
 # LLM
 TOGETHER_API_KEY= os.environ.get("TOGETHER_API_KEY")
+TOGETHER_MODEL_NAME= os.environ.get("TOGETHER_MODEL_NAME") or "togethercomputer/llama-2-70b-chat"
 
 # Mattermost
 MATTERMOST_SERVER_URL= os.environ.get("MATTERMOST_SERVER_URL") or "http://localhost:8065/api/v4"

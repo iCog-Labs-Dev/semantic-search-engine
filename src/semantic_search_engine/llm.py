@@ -3,14 +3,14 @@ import together
 from pydantic import Extra, root_validator #, Field
 from langchain.llms.base import LLM
 from langchain.utils import get_from_dict_or_env
-from semantic_search_engine.constants import TOGETHER_API_KEY
+from semantic_search_engine.constants import TOGETHER_API_KEY, TOGETHER_MODEL_NAME
 
 
 class TogetherLLM(LLM):
     """A custom langchain LLM wrapper for togetherAI
     """
 
-    model: str = "togethercomputer/llama-2-70b-chat"
+    model: str = TOGETHER_MODEL_NAME
     together_api_key: str = TOGETHER_API_KEY
 
     temperature: float = 0.7
@@ -54,3 +54,8 @@ class TogetherLLM(LLM):
             return 'An error occurred!'
         
         return text
+
+    def start():
+        together.Models.start(TOGETHER_MODEL_NAME)
+    def stop():
+        together.Models.stop(TOGETHER_MODEL_NAME)
