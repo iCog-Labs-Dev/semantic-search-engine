@@ -3,6 +3,7 @@ import shutil
 import unittest
 from semantic_search_engine import constants
 from semantic_search_engine.semantic_search import SemanticSearch
+from semantic_search_engine.constants import TOGETHER_API_KEY
 import together
 import os
 
@@ -11,7 +12,7 @@ class TestSemanticTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         # setup togetherAI
-        together.api_key = os.environ.get("TOGETHER_API_KEY")
+        together.api_key = TOGETHER_API_KEY
         together.Models.start("togethercomputer/llama-2-7b-chat")
 
         # setup semantic search
@@ -80,8 +81,6 @@ class TestSemanticTest(unittest.TestCase):
         # placeholder assertion
         self.assertEqual(1,1)
 
-    def test_dummy(self):
-        self.assertEqual(1,1)
 
 
 if __name__ == "__main__":
