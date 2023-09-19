@@ -1,6 +1,10 @@
 __pycache__
 .venv
+venv
 .vscode
 environment.py
 chroma_db/
 slackdata/
+archive/
+.env
+sqlite.db
