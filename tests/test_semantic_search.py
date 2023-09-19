@@ -1,8 +1,8 @@
 
 import shutil
 import unittest
-from semantic_search_engine import constants
-from semantic_search_engine.semantic_search import SemanticSearch
+from src import constants
+from src.semantic_search import SemanticSearch
 import together
 import os
 
