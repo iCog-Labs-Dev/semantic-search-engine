@@ -65,6 +65,20 @@ class SemanticSearch():
                 embedding_function= self.embedding_function
             )  # this should ge only get_collection      
 
+    def __filter(self, user_id : str) -> list[str]:
+        """extracts and returns a list of chat ids in which a user is permitted to view.
+
+        Parameters
+        ----------
+        user_id : str
+            the id of the user making the query
+
+        Returns
+        -------
+        list[str]
+            a list of chat ids a user is permitted to view
+        """
+        # TODO : implement chat filter functionality
    
     def semantic_search(self, query : str):
         """executes a semantic search on an LLM based on a certain query from a\
@@ -86,9 +100,13 @@ class SemanticSearch():
         # TODO : implement the code below with crud
         query_result = self.collection.query(
             query_texts=[query],
+            # Get all messages from slack or specific channels that the user's a member of in MM
             # where = {
-            #     "chat" : {
-            #         "$in" : chat_ids
+            #     "$or" : { 
+            #         "chat" : {
+            #             "$in" :  self.__filter('user_id')
+            #         },
+            #         "platform" : "slack"
             #     }
             # }
         )
