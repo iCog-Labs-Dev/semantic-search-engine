@@ -5,6 +5,7 @@ from semantic_search_engine import constants
 from langchain import LLMChain, PromptTemplate
 from chromadb.utils import embedding_functions
 from langchain.llms.base import LLM
+from semantic_search_engine.mattermost import Mattermost
 
 class SemanticSearch():
     """The entrypoint to the package that contains the necessary data to 
@@ -17,7 +18,7 @@ class SemanticSearch():
 
         # prompt template to be used by a chain
         self.prompt_template = PromptTemplate(
-            input_variables=["context", "metadata", "query"],
+            input_variables=["context", "query"],
 
             # the system prompt needs work
             template=\
@@ -37,9 +38,7 @@ class SemanticSearch():
                 <</SYS>> \n\n 
                 [INST]\n
                     context: \n\n{context} \n\n\n\
-                    metadata: \n\n{metadata} \n\n\n\
                     human query: {query}\n\
-                    your response:\n \
                 [/INST]
             """
         )
@@ -65,22 +64,22 @@ class SemanticSearch():
                 embedding_function= self.embedding_function
             )  # this should ge only get_collection      
 
-    def __filter(self, user_id : str) -> list[str]:
-        """extracts and returns a list of chat ids in which a user is permitted to view.
+    # def __filter(self, user_id : str) -> list[str]:
+    #     """extracts and returns a list of chat ids in which a user is permitted to view.
 
-        Parameters
-        ----------
-        user_id : str
-            the id of the user making the query
+    #     Parameters
+    #     ----------
+    #     user_id : str
+    #         the id of the user making the query
 
-        Returns
-        -------
-        list[str]
-            a list of chat ids a user is permitted to view
-        """
-        # TODO : implement chat filter functionality
+    #     Returns
+    #     -------
+    #     list[str]
+    #         a list of chat ids a user is permitted to view
+    #     """
+    #     # TODO : implement chat filter functionality
    
-    def semantic_search(self, query : str):
+    def semantic_search(self, query : str, user_id: str):
         """executes a semantic search on an LLM based on a certain query from a\
         vector db.
 
@@ -97,27 +96,37 @@ class SemanticSearch():
         str
             an explanation of for the query provided by the LLM
         """
-        # TODO : implement the code below with crud
+        # TODO: if public or (MM && private && in:channels_list) or slack
+        channels_list = Mattermost().get_user_channels(user_id=user_id)
+
         query_result = self.collection.query(
             query_texts=[query],
             # Get all messages from slack or specific channels that the user's a member of in MM
-            # where = {
-            #     "$or" : { 
-            #         "chat" : {
-            #             "$in" :  self.__filter('user_id')
-            #         },
-            #         "platform" : "slack"
-            #     }
-            # }
-        )
-
-        return self.chain.run(
-            { 
-                "context" : query_result["documents"][0][0],
-                "metadata" : query_result["metadatas"][0][0],
-                "query" : query    
+            where = {
+                "$or" : [
+                    {
+                        "platform" : "sl"
+                    },
+                    # "$and" : [ { "access" : "private" } ]
+                    {
+                        "channel_id" : {
+                                        "$in" : channels_list
+                                       }
+                    }
+                ]
             }
         )
+
+        print(query_result)
+
+        return 'ok'
+
+        # return self.chain.run(
+        #     { 
+        #         "context" : query_result["documents"][0][0],
+        #         "query" : query    
+        #     }
+        # )
 
 
 class SemanticSearchBuilder():

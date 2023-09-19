@@ -190,7 +190,7 @@ class Mattermost:
         self.collection.add(
             ids=msg_ids,
             documents=messages,
-            metadatas=[{**{'user_id': x}, **{'channel_id': y}} for x, y in zip(user_ids, channel_ids)]
+            metadatas=[{**{'user_id': x}, **{'channel_id': y}, "platform":"mm"} for x, y in zip(user_ids, channel_ids)]
         )
         
         print('Total Posts SUB: ', len(posts))
