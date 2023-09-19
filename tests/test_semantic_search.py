@@ -83,15 +83,6 @@ class TestSemanticTest(unittest.TestCase):
     def test_dummy(self):
         self.assertEqual(1,1)
 
-class TestSemanticSearchBuilder(unittest.TestCase):
-
-    @classmethod
-    def setUpClass(cls) -> None:
-        pass
-
-    @classmethod
-    def tearDownClass(cls) -> None:
-        pass
 
 if __name__ == "__main__":
     unittest.main()

@@ -26,6 +26,7 @@
 
 #     @classmethod
 #     def tearDownClass(cls) -> None:
+#         del()
 #         shutil.rmtree(constants.CHROMA_PATH)
             
 #     def test_multiple_instantiations(self):
