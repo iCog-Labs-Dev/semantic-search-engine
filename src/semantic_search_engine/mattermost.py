@@ -252,3 +252,54 @@ class Mattermost:
 
         print('isEmpty: ', self.nextFetchScheduler.empty())
         return 'Stopped!'
+    
+    # Privacy Feature in Mattermost
+
+    def get_user_teams(self, authHeader, userId):
+        teamRes = requests.get(
+            self.mmUrl + "/users/" + userId + "/teams",
+            headers={
+                "Content-type": "application/json; charset=UTF-8",
+                "Authorization": authHeader,
+            },
+        )
+
+        # Guard against bad requests
+        if teamRes.status_code != requests.codes.ok:
+            print("Get User's teams request failed with status code: ", teamRes.status_code)
+            return
+
+        return teamRes.json()
+
+    def get_channels_for_user_team(self, authHeader, userId, teamId):
+        userChannelsRes = requests.get(
+            self.mmUrl + "/users/" + userId + "/teams/" + teamId + "/channels",
+            headers={
+                "Content-type": "application/json; charset=UTF-8",
+                "Authorization": authHeader,
+            },
+        )
+
+        # Guard against bad requests
+        if userChannelsRes.status_code != requests.codes.ok:
+            print("Get User's teams request failed with status code: ", userChannelsRes.status_code)
+            return
+
+        return userChannelsRes.json()
+    
+    def get_user_channels(self, user_id: str) -> [str]:
+        authHeader = "Bearer " + MM_PERSONAL_ACCESS_TOKEN
+        # user_id = login().json()['id']
+
+        teams = self.get_user_teams(authHeader, user_id)
+
+        channels = []
+        for team in teams:
+            channel = self.get_channels_for_user_team(authHeader, user_id, team['id'])
+            channels.extend(channel)
+
+        channels = list({v['id']:v for v in channels}.values()) # make the channels list unique
+
+        print('Total Channels: ', len(channels))
+
+        return channels
