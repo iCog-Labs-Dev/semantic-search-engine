@@ -1,11 +1,10 @@
 from chromadb import EmbeddingFunction
-from semantic_search_engine.llm import TogetherLLM
-from semantic_search_engine.chroma import ChromaSingleton
-from semantic_search_engine import constants
+from src.llm import TogetherLLM
+from src.chroma import ChromaSingleton
+from src import constants
 from langchain import LLMChain, PromptTemplate
 from chromadb.utils import embedding_functions
 from langchain.llms.base import LLM
-import os
 
 class SemanticSearch():
     """The entrypoint to the package that contains the necessary data to 
@@ -66,8 +65,22 @@ class SemanticSearch():
                 embedding_function= self.embedding_function
             )  # this should ge only get_collection      
 
+    def __filter(self, user_id : str) -> list[str]:
+        """extracts and returns a list of chat ids in which a user is permitted to view.
+
+        Parameters
+        ----------
+        user_id : str
+            the id of the user making the query
+
+        Returns
+        -------
+        list[str]
+            a list of chat ids a user is permitted to view
+        """
+        # TODO : implement chat filter functionality
    
-    def semantic_search(self, query : str, user : str = ""):
+    def semantic_search(self, query : str):
         """executes a semantic search on an LLM based on a certain query from a\
         vector db.
 
@@ -87,9 +100,13 @@ class SemanticSearch():
         # TODO : implement the code below with crud
         query_result = self.collection.query(
             query_texts=[query],
+            # Get all messages from slack or specific channels that the user's a member of in MM
             # where = {
-            #     "chat" : {
-            #         "$in" : self.__filter(user)
+            #     "$or" : { 
+            #         "chat" : {
+            #             "$in" :  self.__filter('user_id')
+            #         },
+            #         "platform" : "slack"
             #     }
             # }
         )
