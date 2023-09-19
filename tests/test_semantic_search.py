@@ -3,15 +3,14 @@ import shutil
 import unittest
 from src import constants
 from src.semantic_search import SemanticSearch
-import together
-import os
+from src.constants import TOGETHER_API_KEY
 
 class TestSemanticTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
         # setup togetherAI
-        together.api_key = os.environ.get("TOGETHER_API_KEY")
+        together.api_key = TOGETHER_API_KEY
         together.Models.start("togethercomputer/llama-2-7b-chat")
 
         # setup semantic search

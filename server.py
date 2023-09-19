@@ -1,7 +1,7 @@
 from flask import Flask, request
 from flask_cors import CORS
 from src.semantic_search import SemanticSearch
-from src.mattermost import getAllPosts
+from src.mattermost import Mattermost
 import os
 
 app = Flask(__name__)
@@ -35,7 +35,7 @@ def semantic_search():
     
 @app.route('/start-sync', methods=['GET'])
 def start_sync():
-    getAllPosts()
+    Mattermost().getAllPosts()
 
 # ************************************************************** /delete_collection
 
