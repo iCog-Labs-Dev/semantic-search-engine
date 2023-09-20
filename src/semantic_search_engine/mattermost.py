@@ -181,21 +181,40 @@ class Mattermost:
                 postParams['page'] += 1
                 previousPostId = postsRes['prev_post_id']
         
-        
-        msg_ids=[post['msg_id'] for post in posts]
-        messages=[post['message'] for post in posts]
-        user_ids=[post['user_id'] for post in posts]
-        channel_ids=[post['channel_id'] for post in posts]
-        
-        self.collection.add(
-            ids=msg_ids,
-            documents=messages,
-            metadatas=[{**{'user_id': x}, **{'channel_id': y}, "platform":"mm"} for x, y in zip(user_ids, channel_ids)]
-        )
+        if posts:
+            msg_ids=[post['msg_id'] for post in posts]
+            messages=[post['message'] for post in posts]
+            user_ids=[post['user_id'] for post in posts]
+            channel_ids=[post['channel_id'] for post in posts]
+            
+            self.collection.upsert(
+                ids=msg_ids,
+                documents=messages,
+                metadatas=[{**{'user_id': x}, **{'channel_id': y}, "platform":"mm"} for x, y in zip(user_ids, channel_ids)]
+            )
         
         print('Total Posts SUB: ', len(posts))
         # print(' *************************** All POSTS *************************** \n', posts)
 
+        '''
+            {
+                "id" : "message_id",
+
+                "document" : "message",
+
+                "metadata" : {
+                    "platform": "sl / mm",
+                    "access" : "pri / pub",
+                    "channel_id" : "ch_sdfsa",
+                    "user_id" : "usr_dfsdf",
+                }
+            }
+
+            # user_id -> realname 
+            # message_id -> time sent
+            # channel_id -> channel name
+        
+        '''
 
     def start_sync(self):
         print('Starting mattermost data sync ...')
@@ -207,7 +226,8 @@ class Mattermost:
         print('\n')
         
         channels = self.getChannels(authHeader) # get all channels
-        fetchIntervalInSeconds = 3 * 60 # fetch interval in seconds  
+        # fetchIntervalInSeconds = 3 * 60 # fetch interval in seconds  
+        fetchIntervalInSeconds = 5 # fetch interval in seconds  
 
         # Get the last fetch time from shelve file store
         with shelve.open(self.shelve_name) as db: # handles the closing of the shelve file automatically with context manager
@@ -303,3 +323,69 @@ class Mattermost:
         print('Total Channels: ', len(channels))
 
         return channels
+
+    def get_user_details(self, user_id, *args):
+        res = requests.get(
+            self.mmUrl + "/users/" + user_id,
+            headers={
+                "Content-type": "application/json; charset=UTF-8",
+                "Authorization": "Bearer " + MM_PERSONAL_ACCESS_TOKEN,
+            },
+        )
+
+        if res.status_code != requests.codes.ok:
+            print("Get user details request failed with status code: ", res.status_code)
+            return
+
+        user_details = res.json()
+        filtered_user_details = {}
+
+        for field in args:
+            filtered_user_details[field] = user_details[field]
+
+        return filtered_user_details
+        # return user_details.json()
+
+    def get_details(self, entity, mm_id, args):
+        res = requests.get(
+            f"{self.mmUrl}/{entity}/{mm_id}",
+            headers={
+                "Content-type": "application/json; charset=UTF-8",
+                "Authorization": "Bearer " + MM_PERSONAL_ACCESS_TOKEN,
+            },
+        )
+
+        if res.status_code != requests.codes.ok:
+            print(f"Get {entity} details request failed with status code: ", res.status_code)
+            return
+
+        details = res.json()
+        filtered_details = {}
+
+        for field in args:
+            filtered_details[str(field)] = details[str(field)]
+
+        return filtered_details
+        # return details.json()
+
+    def get_user_details(self, user_id, *args):
+        print(self.get_details('users', user_id, args))
+        return self.get_details('users', user_id, args)
+
+    def get_channel_details(self, channel_id, *args):
+        print(self.get_details('channels', channel_id, args))
+        return self.get_details('channels', channel_id, args)
+    
+    def get_post_details(self, post_id, *args):
+        print(self.get_details('posts', post_id, args))
+        return self.get_details('posts', post_id, args)
+
+
+Mattermost().get_user_details('ioff979djbn97juwtkx9cizq9e', 'first_name', 'last_name', 'username', 'email')             # Admin
+Mattermost().get_user_details('r3dhbuhw9f8gjpwyexd7ex4iuy', 'first_name', 'last_name', 'username', 'email', 'is_bot')   # Feedback-bot
+
+Mattermost().get_channel_details('9wgspwmu53y6mg1s6dpsbjzagy', 'name', 'display_name', 'type', 'team_id')   # hyperon           (public)
+Mattermost().get_channel_details('z4kqay9m1jdxipatytm7eyteur', 'name', 'display_name', 'type', 'team_id')   # icog-hyperon-team (private)
+
+Mattermost().get_post_details('u95bn1e1kiyg8d98hor7rwupwh', 'message', 'type', 'channel_id', 'user_id')     # Hello
+Mattermost().get_post_details('e68a8f4gsjya7g4isfujyej1fe', 'message', 'type', 'channel_id', 'user_id')     # Channel join
