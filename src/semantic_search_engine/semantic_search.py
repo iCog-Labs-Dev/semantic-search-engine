@@ -15,32 +15,35 @@ class SemanticSearch():
     def __init__(self) -> None:
         """initializes the necessary data to perform a semantic search
         """        
-
+        # Sample prompt
+        # '''
+        # You are a helpful assistant, you will only answer the questions the Human asks. You will be given a chat message as context. \
+        # Write a response that explains the human query based on what is discussed in the chat message.You must answer questions using the context provided. \
+        # A metadata that contains data related to the chat message will be provided. 
+        # The metadata will be a json with a user key that represents the sender of the message and a ts key which is the timestamp of the time the chat message was sent. \
+        # Use this data to better explain the chat message. If there isn't enough context, simply reply "This topic was not discussed previously"
+        # '''
         # prompt template to be used by a chain
         self.prompt_template = PromptTemplate(
             input_variables=["context", "query"],
 
             # the system prompt needs work
-            template=\
-            """
-                <<SYS>> \n 
-                    You are a helpful assistant, You will only answer the\
-                    questions the Human asks. You will be given a chat\
-                    message as context. Write a response that explains the human\
-                    query based on what is discussed in the chat message.You\must\
-                    answer questions using the context provided.A metadata that\
-                    contains data related to the chat message will be provided.\
-                    the metadata will be a json with a user key that represents the\
-                    sender of the message and a ts key which is the timestamp of the\
-                    time the chat message was sent.\ use this data to better explain\
-                    the chat message.. If there isn't enough context, simply reply "This\
-                    topic was not discussed previously"\
-                <</SYS>> \n\n 
-                [INST]\n
-                    context: \n\n{context} \n\n\n\
-                    human query: {query}\n\
-                [/INST]
-            """
+            template="""
+[INST]\n
+    <<SYS>>
+        * Your name is SNET and you are a helpful semantic search assistant.
+        * You will be given a sequence of chat messages as context. 
+        * Write a response that answers the question based on what is given to you as context in the chat messages.
+        * You must answer the question based on only chat messages you are given.
+        * Don't answer anything outside the context you are provided and do not respond with anything from your general knowledge.
+        * Try to mention the ones that you get the context from.
+        * If there isn't enough context, simply reply "This topic was not discussed previously"
+    <</SYS>>\n
+
+    ### Context (chat messages): \n\n{context}\n\n
+    ### Query: {query}\n
+[/INST]
+"""
         )
 
         # embedding function to be used by chroma
@@ -53,6 +56,7 @@ class SemanticSearch():
         self.chain = LLMChain(
                 llm=self.llm, 
                 prompt=self.prompt_template,
+                verbose=True
                 # include the necessary output parser
             )
         
@@ -99,36 +103,37 @@ class SemanticSearch():
         """
         # TODO: if public or (MM && private && in:channels_list) or slack
         channels_list = Mattermost().get_user_channels(user_id=user_id)
+        print(channels_list)
 
         query_result = self.collection.query(
             query_texts=[query],
+            n_results=100
             # Get all messages from slack or specific channels that the user's a member of in MM
-            where = {
-                "$or" : [
-                    {
-                        "platform" : "sl"
-                    },
-                    # "$and" : [ { "access" : "private" } ]
-                    {
-                        "channel_id" : {
-                                        "$in" : channels_list
-                                       }
-                    }
-                ]
-            }
+            # where = {
+            #     "$or" : [
+            #         {
+            #             "platform" : "sl"
+            #         },
+            #         # "$and" : [ { "access" : "private" } ]
+            #         {
+            #             "channel_id" : {
+            #                             "$in" : channels_list
+            #                            }
+            #         }
+            #     ]
+            # }
         )
 
+        # context = []
+        # for msg in query_result["documents"][0]:
+        #     context.append('(date) Someone: ' + msg)
 
-        print(query_result)
-
-        return 'ok'
-
-        # return self.chain.run(
-        #     { 
-        #         "context" : query_result["documents"][0][0],
-        #         "query" : query    
-        #     }
-        # )
+        return self.chain.run(
+            { 
+                "context" : '\n'.join( query_result["documents"][0] ),
+                "query" : query    
+            }
+        )
 
 
 
