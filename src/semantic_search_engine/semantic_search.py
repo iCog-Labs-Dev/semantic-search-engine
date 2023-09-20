@@ -63,6 +63,7 @@ class SemanticSearch():
                 constants.CHROMA_COLLECTION,
                 embedding_function= self.embedding_function
             )  # this should ge only get_collection      
+        
 
     # def __filter(self, user_id : str) -> list[str]:
     #     """extracts and returns a list of chat ids in which a user is permitted to view.
@@ -117,6 +118,7 @@ class SemanticSearch():
             }
         )
 
+
         print(query_result)
 
         return 'ok'
@@ -127,6 +129,22 @@ class SemanticSearch():
         #         "query" : query    
         #     }
         # )
+
+
+
+    
+
+    def get_user_details(self, user_id, *args, datasource = "mm"):
+        pass
+    
+    def get_channel_details(channel_id, *args):
+        pass
+
+    def get_message_details(message_id, *args):
+        pass
+
+
+
 
 
 class SemanticSearchBuilder():
