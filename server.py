@@ -1,9 +1,15 @@
 from flask import Flask, request
 from flask_cors import CORS
+import os
 from semantic_search_engine.semantic_search import SemanticSearch
 from semantic_search_engine.mattermost import Mattermost
 from semantic_search_engine.llm import TogetherLLM as together
-import os
+
+#Test
+from chromadb.utils import embedding_functions
+from semantic_search_engine.chroma import ChromaSingleton
+from semantic_search_engine import constants
+
 
 app = Flask(__name__)
 CORS(app)
@@ -14,6 +20,38 @@ CORS(app)
 def root_route():
     if request.method == 'GET':
         return '''<h1>Hi ✋</h1>'''
+
+
+
+# =========== Test Chroma ===========
+@app.route('/chroma', methods=['GET'])
+def chroma_route():
+    collection = ChromaSingleton().\
+            get_connection().\
+            get_or_create_collection(
+                constants.CHROMA_COLLECTION,
+                embedding_function= embedding_functions.DefaultEmbeddingFunction()
+            ) 
+    return collection.query(
+        query_texts=['Hello'],
+        n_results=100
+        # Get all messages from slack or specific channels that the user's a member of in MM
+        # where = {
+        #     "$or" : [
+        #         {
+        #             "platform" : "sl"
+        #         },
+        #         # "$and" : [ { "access" : "private" } ]
+        #         {
+        #             "channel_id" : {
+        #                             "$in" : channels_list
+        #                             }
+        #         }
+        #     ]
+        # }
+    )
+
+
 
 
 # ************************************************************** /search
@@ -39,15 +77,17 @@ def semantic_search():
     
 @app.route('/start-sync', methods=['GET'])
 def start_sync():
-    together().start()
+    # together().start()
     Mattermost().start_sync()
+    return 'Started sync!'
 
 # ************************************************************** /stop-sync
  
 @app.route('/stop-sync', methods=['GET'])
 def stop_sync():
-    together().stop()
+    # together().stop()
     Mattermost().stop_sync()
+    return 'Stopped sync!'
 
 # ************************************************************** /slack
 @app.route('/slack', methods=['GET', 'POST'])
