@@ -1,9 +1,10 @@
 from flask import Flask, request
 from flask_cors import CORS
 import os
+import shelve
 from semantic_search_engine.semantic_search import SemanticSearch
 from semantic_search_engine.mattermost import Mattermost
-from semantic_search_engine.llm import TogetherLLM as together
+# from semantic_search_engine.llm import TogetherLLM as together
 
 #Test
 from chromadb.utils import embedding_functions
@@ -24,34 +25,33 @@ def root_route():
 
 
 # =========== Test Chroma ===========
-@app.route('/chroma', methods=['GET'])
-def chroma_route():
+@app.route('/chroma/<action>', methods=['GET'])
+def chroma_route(action):
     collection = ChromaSingleton().\
             get_connection().\
             get_or_create_collection(
                 constants.CHROMA_COLLECTION,
                 embedding_function= embedding_functions.DefaultEmbeddingFunction()
             ) 
-    return collection.query(
-        query_texts=['Hello'],
-        n_results=100
-        # Get all messages from slack or specific channels that the user's a member of in MM
-        # where = {
-        #     "$or" : [
-        #         {
-        #             "platform" : "sl"
-        #         },
-        #         # "$and" : [ { "access" : "private" } ]
-        #         {
-        #             "channel_id" : {
-        #                             "$in" : channels_list
-        #                             }
-        #         }
-        #     ]
-        # }
-    )
-
-
+    if action == 'query':
+        return collection.query(
+            query_texts=['Hello'],
+            n_results=100
+            # Get all messages from slack or specific channels that the user's a member of in MM
+            # where = {
+            #     "$or" : [
+            #         {
+            #             "platform" : "sl"
+            #         },
+            #         # "$and" : [ { "access" : "private" } ]
+            #         {
+            #             "channel_id" : {
+            #                             "$in" : channels_list
+            #                             }
+            #         }
+            #     ]
+            # }
+        )
 
 
 # ************************************************************** /search
@@ -98,11 +98,28 @@ def upsert_slack():
 
 # ************************************************************** /reset-all
 
-@app.route('/reset-all', methods=['GET', 'POST'])
-def reset_all():
-    pass
-#     TODO: delete the chroma collection
-#     TODO: delete the 'slack' and 'last_fetch_time' stores
+@app.route('/reset/<action>', methods=['GET', 'POST'])
+def reset_all(action):
+    Mattermost().stop_sync()
+    if action=='mattermost' or action=='all':
+        # Delete the chroma collection
+        try:
+            ChromaSingleton().get_connection().delete_collection(name=constants.CHROMA_COLLECTION)
+            print(f'Chroma collection "{constants.CHROMA_COLLECTION}" deleted!')
+            # Delete mattermost shelve store
+            with shelve.open(constants.MM_SHELVE_NAME) as db:
+                del db
+                print('Mattermost shelve deleted!')
+        except:
+            print(f'No collection named {constants.CHROMA_COLLECTION} detected or the shelve "{constants.MM_SHELVE_NAME}" doesn\'t exist')
+
+    if action=='slack' or action=='all':
+        pass
+        # TODO: Delete slack shelve store
+        '''with shelve.open(constants.SLACK_SHELVE_NAME) as db:
+        del db[constants.SLACK_SHELVE_NAME]'''
+    
+    return 'Reset Successful!'
 
 port_no = os.environ.get('PORT', 5555)
 
