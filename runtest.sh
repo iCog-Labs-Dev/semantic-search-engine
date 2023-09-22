@@ -4,7 +4,8 @@ source .env
 set +o allexport
 
 # include the python path
-export PYTHONPATH="$PYTHONPATH:./src"
+current_dir=$(pwd)
+export PYTHONPATH="$PYTHONPATH:${current_dir}/src"
 
 # run tests
 python -m unittest -v
