@@ -7,7 +7,7 @@ from semantic_search_engine.mattermost import Mattermost
 # from semantic_search_engine.llm import TogetherLLM as together
 
 #Test
-from chromadb.utils import embedding_functions
+from semantic_search_engine.chroma import ChromaCollection
 from semantic_search_engine.chroma import ChromaSingleton
 from semantic_search_engine import constants
 
@@ -27,12 +27,13 @@ def root_route():
 # =========== Test Chroma ===========
 @app.route('/chroma/<action>', methods=['GET'])
 def chroma_route(action):
-    collection = ChromaSingleton().\
-            get_connection().\
-            get_or_create_collection(
-                constants.CHROMA_COLLECTION,
-                embedding_function= embedding_functions.DefaultEmbeddingFunction()
-            ) 
+    collection = ChromaCollection().chroma_collection()
+    # ChromaSingleton().\
+    #         get_connection().\
+    #         get_or_create_collection(
+    #             constants.CHROMA_COLLECTION,
+    #             embedding_function= embedding_functions.DefaultEmbeddingFunction()
+    #         ) 
     if action == 'query':
         return collection.query(
             query_texts=['Hello'],
@@ -108,8 +109,9 @@ def reset_all(action):
             print(f'Chroma collection "{constants.CHROMA_COLLECTION}" deleted!')
             # Delete mattermost shelve store
             with shelve.open(constants.MM_SHELVE_NAME) as db:
-                del db
-                print('Mattermost shelve deleted!')
+                db[constants.MM_SHELVE_NAME] = 0
+                # del db
+                print('Mattermost shelve reset!')
         except:
             print(f'No collection named {constants.CHROMA_COLLECTION} detected or the shelve "{constants.MM_SHELVE_NAME}" doesn\'t exist')
 
@@ -117,7 +119,7 @@ def reset_all(action):
         pass
         # TODO: Delete slack shelve store
         '''with shelve.open(constants.SLACK_SHELVE_NAME) as db:
-        del db[constants.SLACK_SHELVE_NAME]'''
+        del db'''
     
     return 'Reset Successful!'
 
