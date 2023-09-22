@@ -3,22 +3,17 @@ from sched import scheduler
 import requests
 import shelve
 
-from semantic_search_engine.chroma import ChromaSingleton
+from semantic_search_engine.chroma import ChromaSingleton, ChromaCollection
 from semantic_search_engine.constants import CHROMA_COLLECTION
-from semantic_search_engine.constants import MM_USER_NAME, MM_PASSWORD, MM_PERSONAL_ACCESS_TOKEN, MM_SERVER_URL, MM_FETCH_INTERVAL
+from semantic_search_engine.constants import MM_USER_NAME, MM_PASSWORD, MM_PERSONAL_ACCESS_TOKEN, MM_SERVER_URL, MM_FETCH_INTERVAL, MM_SHELVE_NAME
 
 class Mattermost:
-
-    collection = ChromaSingleton()\
-        .get_connection()\
-        .get_or_create_collection(CHROMA_COLLECTION)
-    
 
     mm_server_url = MM_SERVER_URL
     fetchIntervalInSeconds = MM_FETCH_INTERVAL
     
     nextFetchScheduler = scheduler(time, sleep)
-    shelve_name = 'last_fetch_time'
+    shelve_name = MM_SHELVE_NAME
 
     # authenticate a user (through the MM API)
     def get_auth_token(self):
@@ -90,12 +85,12 @@ class Mattermost:
 
         # Get the last fetch time from shelve file store
         with shelve.open(self.shelve_name) as db: # handles the closing of the shelve file automatically with context manager
-            if 'lastFetchTime' in db:
-                lastFetchTime = db['lastFetchTime']
+            if self.shelve_name in db:
+                lastFetchTime = db[self.shelve_name]
             else:
                 lastFetchTime = 0
             # Set the last fetch time to the current time for next api call
-            db['lastFetchTime'] = time()
+            db[self.shelve_name] = time()
         db.close()  # Close the shelve just in case
 
         # calculate the time passed since lastFetchTIme
@@ -112,6 +107,7 @@ class Mattermost:
         no_posts = 0
 
         print('Request Params: ', postParams)
+
         for channel in channels:
             # 200 is the max number of posts per page
             # reset page to 0 for each channel
@@ -128,7 +124,7 @@ class Mattermost:
                     params=postParams
                 )
 
-                fields = ['id', 'message', 'user_id', 'channel_id']
+                fields = ['id', 'message', 'user_id', 'type', 'channel_id']
 
                 # Get the ids for all posts in the 'order' field and filter out each fields we want for each post
                 '''
@@ -141,57 +137,77 @@ class Mattermost:
                     }
                 '''
                 posts = [ { field: postsRes['posts'][postId][field] for field in fields } for postId in postsRes['order'] ]
+                access = ''
                 
-                if posts:
-                    user_ids=[post['user_id'] for post in posts]
-                    channel_ids=[post['channel_id'] for post in posts]
-                    
-                    self.collection.upsert(
-                        ids=[post['id'] for post in posts],
-                        documents=[post['message'] for post in posts],
-                        metadatas=[{**{'user_id': x}, **{'channel_id': y}, "platform":"mm"} for x, y in zip(user_ids, channel_ids)]
+                # Get the channel's access restriction (private / public)
+                if channel["type"] == 'O':  access = 'pub'
+                elif channel["type"] == 'P':  access = 'pri'
+                else: continue
+                
+                # Filter out any channel join and other type messages. Also filter out any empty string messages (only images, audio, ...)
+                # TODO: filter out any stickers / emojis
+                # TODO: replace user handles with their real names
+                filtered_posts = []
+                
+                print(channel)
+                print(posts)
+                for post in posts:
+                    print('POST ************** ', post)
+                    if (post['type']=='') and (post['message']): # If the 'type' is empty, that means it's a normal message (instead of 'system_join_channel')
+                        filtered_posts.append(post)
+
+                if filtered_posts:   # If the channel has any posts left
+                    user_ids=[post['user_id'] for post in filtered_posts]
+                    channel_ids=[post['channel_id'] for post in filtered_posts]
+
+                    '''
+                        {
+                            "id" : "message_id",
+
+                            "document" : "message_text",
+
+                            "metadata" : {
+                                "platform": "sl / mm",
+                                "access" : "pri / pub",
+                                "channel_id" : "ch_sdfsa",
+                                "user_id" : "usr_dfsdf",
+                            }
+                        }
+                    '''
+                    collection = ChromaCollection().chroma_collection()
+                    # ChromaSingleton()\
+                    # .get_connection()\
+                    # .get_or_create_collection(CHROMA_COLLECTION)
+    
+                    collection.upsert(
+                        ids=[post['id'] for post in filtered_posts],
+                        documents=[post['message'] for post in filtered_posts],
+                        metadatas=[{**{'user_id': x}, 
+                                    **{'channel_id': y},
+                                    "access": access,
+                                    "platform":"mm"}  for x, y in zip(user_ids, channel_ids)]
                     )
 
                 # Update the page number and previousPostId for the next page of posts
                 postParams['page'] += 1
                 previousPostId = postsRes['prev_post_id']
-                no_posts += len(posts)
-        
+                no_posts += len(filtered_posts)
         
         print('Total posts fetched: ', no_posts)
         # print(' *************************** All POSTS *************************** \n', posts)
 
-        '''
-            {
-                "id" : "message_id",
-
-                "document" : "message",
-
-                "metadata" : {
-                    "platform": "sl / mm",
-                    "access" : "pri / pub",
-                    "channel_id" : "ch_sdfsa",
-                    "user_id" : "usr_dfsdf",
-                }
-            }
-
-            # user_id -> realname 
-            # message_id -> time sent
-            # channel_id -> channel name
-        
-        '''
 
     def start_sync(self):
         print('Starting mattermost data sync ...')
         
-        channels = self.get_all_channels('id') # get all channels
+        channels = self.get_all_channels('id', 'type') # get all channels
         # self.fetchIntervalInSeconds = 3 * 60 # fetch interval in seconds  
         self.fetchIntervalInSeconds = 5 # fetch interval in seconds  
 
         # Get the last fetch time from shelve file store
         with shelve.open(self.shelve_name) as db: # handles the closing of the shelve file automatically with context manager
-            if 'lastFetchTime' in db:
-                lastFetchTime = db['lastFetchTime']
+            if self.shelve_name in db:
+                lastFetchTime = db[self.shelve_name]
             else:
                 lastFetchTime = 0
             db.close()
@@ -308,6 +324,10 @@ class Mattermost:
         return self.get_details('posts', post_id, args)
 
 """
+    # user_id -> realname 
+    # message_id -> time sent
+    # channel_id -> channel name
+
 Mattermost().get_user_details('ioff979djbn97juwtkx9cizq9e', 'first_name', 'last_name', 'username', 'email')             # Admin
 Mattermost().get_user_details('r3dhbuhw9f8gjpwyexd7ex4iuy', 'first_name', 'last_name', 'username', 'email', 'is_bot')   # Feedback-bot
 

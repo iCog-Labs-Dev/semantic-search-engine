@@ -1,11 +1,11 @@
 from chromadb import EmbeddingFunction
 from semantic_search_engine.llm import TogetherLLM
-from semantic_search_engine.chroma import ChromaSingleton
+from semantic_search_engine.chroma import ChromaSingleton, ChromaCollection
 from semantic_search_engine import constants
 from langchain import LLMChain, PromptTemplate
 from chromadb.utils import embedding_functions
 from langchain.llms.base import LLM
-from semantic_search_engine.mattermost import Mattermost
+from semantic_search_engine.mattermost import Mattermost as MM
 
 class SemanticSearch():
     """The entrypoint to the package that contains the necessary data to 
@@ -59,30 +59,6 @@ class SemanticSearch():
                 verbose=True
                 # include the necessary output parser
             )
-        
-        # a chroma collection
-        self.collection = ChromaSingleton().\
-            get_connection().\
-            get_or_create_collection(
-                constants.CHROMA_COLLECTION,
-                embedding_function= self.embedding_function
-            )  # this should ge only get_collection      
-        
-
-    # def __filter(self, user_id : str) -> list[str]:
-    #     """extracts and returns a list of chat ids in which a user is permitted to view.
-
-    #     Parameters
-    #     ----------
-    #     user_id : str
-    #         the id of the user making the query
-
-    #     Returns
-    #     -------
-    #     list[str]
-    #         a list of chat ids a user is permitted to view
-    #     """
-    #     # TODO : implement chat filter functionality
    
     def semantic_search(self, query : str, user_id: str):
         """executes a semantic search on an LLM based on a certain query from a\
@@ -102,53 +78,118 @@ class SemanticSearch():
             an explanation of for the query provided by the LLM
         """
         # TODO: if public or (MM && private && in:channels_list) or slack
-        channels_list = Mattermost().get_user_channels(user_id=user_id)
+        channels_list = MM().get_user_channels(user_id=user_id)
         print(channels_list)
 
-        query_result = self.collection.query(
+        # Get or create a chroma collection
+        collection = ChromaCollection().chroma_collection()
+        ChromaSingleton().\
+            get_connection().\
+            get_or_create_collection(
+                constants.CHROMA_COLLECTION,
+                embedding_function= self.embedding_function
+            )     
+        
+        query_result = collection.query(
             query_texts=[query],
-            n_results=100
+            n_results=100,
             # Get all messages from slack or specific channels that the user's a member of in MM
-            # where = {
-            #     "$or" : [
-            #         {
-            #             "platform" : "sl"
-            #         },
-            #         # "$and" : [ { "access" : "private" } ]
-            #         {
-            #             "channel_id" : {
-            #                             "$in" : channels_list
-            #                            }
-            #         }
-            #     ]
-            # }
+            # where =
+                # {
+                #     "channel_id": {
+                #         "$in": channels_list
+                #     }
+                # } 
+
+                # {
+                #     "$or": [
+                #         {
+                #             "access": {
+                #                 "$eq": "pub"
+                #             }
+                #         },
+                #         {
+                #             "channel_id": {
+                #                 "$in": channels_list
+                #             }
+                #         }
+                #     ]
+                # }
         )
 
         # context = []
         # for msg in query_result["documents"][0]:
         #     context.append('(date) Someone: ' + msg)
 
-        return self.chain.run(
+        details = self.get_metadata_details(query_result["ids"][0], query_result["metadatas"][0], query_result["distances"][0], 'mm')
+
+        llm_response = self.chain.run(
             { 
                 "context" : '\n'.join( query_result["documents"][0] ),
                 "query" : query    
             }
         )
 
+        # print(llm_response, '\n', details)
+
+        return {
+            "llm": llm_response,
+            "context": details
+        }
 
 
-    
+    @staticmethod
+    def get_metadata_details(ids, metadatas, distances, datasource: str = "mm"):
+        response = []
 
-    def get_user_details(self, user_id, *args, datasource = "mm"):
-        pass
-    
-    def get_channel_details(channel_id, *args):
-        pass
+        for idx, metadata in enumerate(metadatas):
+            
+            schema = {
+                "user_name":"",
+                "user_profile_link": "",
+                "channel_name":"",
+                "channel_link":"",
+                "message":"",
+                "message_link":"",
+                "time":"",
+                "platform":"",
+                "access":"",
+                "score":""
+            }
+            if datasource=='mm':
+                mm_data = MM().get_user_details(
+                    metadata['user_id'],
+                    'first_name', 'last_name', 'username'
+                    )
+                real_name = f"{mm_data['first_name']} {mm_data['last_name']}"
+                schema['user_name'] = real_name if real_name != ' ' else mm_data['username']                # 1. user_name
+                # schema['user_profile_link'] = ...                                                         # 2. user_profile_link
+            
+                mm_data = MM().get_channel_details(
+                    metadata['channel_id'],
+                    'name', 'display_name'
+                    )
+                schema['channel_name'] = mm_data['name'] if mm_data['name'] else mm_data['display_name']    # 3. channel_name 
+                # schema['channel_link'] = 'url/teamname/channels/' + schema['channel_name']                # 4. channel_link 
+            
+                mm_data = MM().get_post_details(
+                    ids[idx],
+                    'message', 'update_at' # create_at
+                    )
+                schema['message'] = mm_data['message']                                                      # 5. message
+                # schema['message_link'] = ...                                                              # 6. message_link
+                schema['time'] = mm_data['update_at']                                                       # 7. time
 
-    def get_message_details(message_id, *args):
-        pass
-
-
+                schema['platform'] = metadata['platform']                                                   # 8. platform
+                schema['access'] = metadata['access']                                                       # 9. access
+                schema['score'] = 1 - distances[idx]                                                        # 10. score
+            
+            elif datasource=='sl':
+                pass
+                
+            response.append(schema)
+        
+        return response
 
 
 
