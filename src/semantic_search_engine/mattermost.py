@@ -5,7 +5,7 @@ import shelve
 
 from semantic_search_engine.chroma import ChromaSingleton
 from semantic_search_engine.constants import CHROMA_COLLECTION
-from semantic_search_engine.constants import MM_USER_NAME, MM_PASSWORD, MM_PERSONAL_ACCESS_TOKEN, MATTERMOST_SERVER_URL
+from semantic_search_engine.constants import MM_USER_NAME, MM_PASSWORD, MM_PERSONAL_ACCESS_TOKEN, MM_SERVER_URL, MM_FETCH_INTERVAL
 
 class Mattermost:
 
@@ -14,15 +14,14 @@ class Mattermost:
         .get_or_create_collection(CHROMA_COLLECTION)
     
 
-    mmUrl = MATTERMOST_SERVER_URL
+    mm_server_url = MM_SERVER_URL
+    fetchIntervalInSeconds = MM_FETCH_INTERVAL
     
     nextFetchScheduler = scheduler(time, sleep)
-
     shelve_name = 'last_fetch_time'
 
     # authenticate a user (through the MM API)
     def get_auth_token(self):
-
         loginData = {
                         "login_id": MM_USER_NAME,
                         "password": MM_PASSWORD
@@ -32,74 +31,61 @@ class Mattermost:
         if personal_access_token:
             return personal_access_token
         else:
+            print('Warning: You\'re not using a Personal-Access-Token, your session might expire!')
             return requests.post(
-                self.mmUrl + "/users/login",
+                self.mm_server_url + "/users/login",
                 json=loginData,
                 headers={"Content-type": "application/json; charset=UTF-8"},
             ).headers["token"]
 
-    def getChannels(self, authHeader):
+    def mm_api_GET(self, route: str, params={}):
+        authHeader = "Bearer " + self.get_auth_token()
+
         res = requests.get(
-            self.mmUrl + "/channels",
+            self.mm_server_url + route,
+            params=params,
             headers={
                 "Content-type": "application/json; charset=UTF-8",
                 "Authorization": authHeader,
             },
         )
-
+        
         # Guard against bad requests
         if res.status_code != requests.codes.ok:
-            print("Request failed with status code: ", res.status_code)
-            return
+            raise Exception(f"Request to '{route}' failed with status code: ", res.status_code)
+            
+        return res.json()
 
-        queryChannels = res.json()
-        channels = []
+    @staticmethod
+    def select_fields(response, fields):
+        return [{field: res[field] for field in fields} for res in response]
 
-        # Filter out the channel properties we don't want
-        for channel in queryChannels:
-            tempChannel = {}
+    def get_all_channels(self, *fields: [str]):
+        all_channels = self.mm_api_GET('/channels')
+        return self.select_fields(all_channels, fields)
 
-            tempChannel["id"] = channel["id"]
-            tempChannel["name"] = channel["name"]
-            tempChannel["display_name"] = channel["display_name"]
-            tempChannel["type"] = channel["type"]
-            tempChannel["create_at"] = channel["create_at"]
-            tempChannel["creator_id"] = channel["creator_id"]
-            tempChannel["last_post_at"] = channel["last_post_at"]
-            tempChannel["total_msg_count"] = channel["total_msg_count"]
-
-            channels.append(tempChannel)
-        
-        totalPosts = 0
-        for channel in channels:
-            totalPosts += channel['total_msg_count']
-
-        print('Total Channel: ', len(queryChannels))
-        print('Total Posts: ', totalPosts)
-
-        return channels
-
-    def scheduleFirstEvent(self, fetchIntervalInSeconds, authHeader, channels):
+    def scheduleFirstEvent(self, channels):
         print('scheduleFirstEvent')
         # Add an event to the scheduler
         self.nextFetchScheduler.enter(
             0,
             1, # priority
             self.getPostsForAllChannels, # function to run when the event is triggered
-            [fetchIntervalInSeconds, authHeader, self.nextFetchScheduler, channels] # arguments to pass to the function
+            [self.nextFetchScheduler, channels] # arguments to pass to the function
         ) 
 
-    def getPostsForAllChannels(self, fetchIntervalInSeconds, authHeader, scheduler, channels):
+    def getPostsForAllChannels(self, scheduler, channels):
         print('\n')
         print('*'*50)
         print('\n')
-        print('getPostsForAllChannels')
+        print('Fetching posts for all channels ...')
 
+        # Register next schedule
         scheduler.enter(
-            fetchIntervalInSeconds, 
+            self.fetchIntervalInSeconds, 
             1, 
             self.getPostsForAllChannels, 
-            [fetchIntervalInSeconds, authHeader, scheduler, channels]
+            [scheduler, channels]
         )
 
         # Get the last fetch time from shelve file store
@@ -108,92 +94,71 @@ class Mattermost:
                 lastFetchTime = db['lastFetchTime']
             else:
                 lastFetchTime = 0
-
-        print('current time', time())
-        print('lastFetchTime from store: ', lastFetchTime)
+            # Set the last fetch time to the current time for next api call
+            db['lastFetchTime'] = time()
+        db.close()  # Close the shelve just in case
 
         # calculate the time passed since lastFetchTIme
         timePassedInSeconds = (time() - lastFetchTime)
-        print('Time passed since last fetch SUB: ', timePassedInSeconds)
+        print('Time passed since last fetch: ', timePassedInSeconds)
 
         postParams = {}
 
-        # if timePassedInSeconds >= fetchIntervalInSeconds and lastFetchTime != 0:
+        # if timePassedInSeconds >= self.fetchIntervalInSeconds and lastFetchTime != 0:
         if lastFetchTime != 0:
             postParams = { 'since': int(lastFetchTime * 1000) } # convert to milliseconds
             print('get posts since last fetch time')
+        
+        no_posts = 0
 
-        # Set the last fetch time to the current time for next api call
-        with shelve.open(self.shelve_name) as db:
-            db['lastFetchTime'] = time()
-
-        posts = []
-
-        print('is channels empty: ', channels == [])
-        print('postParams: ', postParams)
+        print('Request Params: ', postParams)
         for channel in channels:
             # 200 is the max number of posts per page
             # reset page to 0 for each channel
             postParams.update({'per_page': 200, 'page': 0})
 
             # previousPostId is used to check if there are more pages of posts
-            previousPostId = ' '
+            previousPostId = '~'
 
             # Loop through all pages of posts for the channel
             while previousPostId != '':
                 # Get the server response for each page of posts
-                postsRes = requests.get(
-                    self.mmUrl + "/channels/" + channel["id"] + "/posts",
-                    params=postParams,
-                    headers={
-                        "Content-type": "application/json; charset=UTF-8",
-                        "Authorization": authHeader,
-                    },
+                postsRes = self.mm_api_GET(
+                    "/channels/" + channel["id"] + "/posts",
+                    params=postParams
                 )
 
-                # Guard against bad requests
-                if postsRes.status_code != requests.codes.ok:
-                    print("Request failed with status code: ", postsRes.status_code)
-                    return
+                fields = ['id', 'message', 'user_id', 'channel_id']
 
-                # Convert the response to JSON
-                postsRes = postsRes.json()
-
-                # Loop through each post in the response in order, filter out the properties we don't want
-                for postId in postsRes['order']:
-                    post = {}
-                    tempPost = postsRes['posts'][postId]
-                    
-                    # Filter out the post properties we don't want
-                    post['msg_id'] = tempPost['id']
-                    # post['root_id'] = tempPost['root_id']
-                    post['channel_id'] = tempPost['channel_id']
-                    post['create_at'] = tempPost['create_at']
-                    post['update_at'] = tempPost['update_at']
-                    post['type'] = tempPost['type']         # type=='' is a normal message
-                    post['message'] = tempPost['message']   # any attachments will be ignored
-                    post['user_id'] = tempPost['user_id']
-
-                    # Add the filtered out post to the posts list
-                    posts.append(post)
+                # Get the ids for all posts in the 'order' field and filter out each fields we want for each post
+                '''
+                This is the schema for the response:
+                    {
+                        "order": [ ...list of post_ids... ],
+                        "posts": {
+                            ...."post_id_1": { ...1st post details... },
+                                "post_id_2": { ...2nd post details... }...  }
+                    }
+                '''
+                posts = [ { field: postsRes['posts'][postId][field] for field in fields } for postId in postsRes['order'] ]
                 
+                if posts:
+                    user_ids=[post['user_id'] for post in posts]
+                    channel_ids=[post['channel_id'] for post in posts]
+                    
+                    self.collection.upsert(
+                        ids=[post['id'] for post in posts],
+                        documents=[post['message'] for post in posts],
+                        metadatas=[{**{'user_id': x}, **{'channel_id': y}, "platform":"mm"} for x, y in zip(user_ids, channel_ids)]
+                    )
+
                 # Update the page number and previousPostId for the next page of posts
                 postParams['page'] += 1
                 previousPostId = postsRes['prev_post_id']
+                no_posts += len(posts)
         
-        if posts:
-            msg_ids=[post['msg_id'] for post in posts]
-            messages=[post['message'] for post in posts]
-            user_ids=[post['user_id'] for post in posts]
-            channel_ids=[post['channel_id'] for post in posts]
-            
-            self.collection.upsert(
-                ids=msg_ids,
-                documents=messages,
-                metadatas=[{**{'user_id': x}, **{'channel_id': y}, "platform":"mm"} for x, y in zip(user_ids, channel_ids)]
-            )
         
-        print('Total Posts SUB: ', len(posts))
+        print('Total posts fetched: ', no_posts)
         # print(' *************************** All POSTS *************************** \n', posts)
 
         '''
@@ -218,16 +183,10 @@ class Mattermost:
 
     def start_sync(self):
         print('Starting mattermost data sync ...')
-
-        authHeader = "Bearer " + self.get_auth_token()
-        print('\n')
-        print('-'*20)
-        print('-'*20)
-        print('\n')
         
-        channels = self.getChannels(authHeader) # get all channels
-        # fetchIntervalInSeconds = 3 * 60 # fetch interval in seconds  
-        fetchIntervalInSeconds = 5 # fetch interval in seconds  
+        channels = self.get_all_channels('id') # get all channels
+        # self.fetchIntervalInSeconds = 3 * 60 # fetch interval in seconds  
+        self.fetchIntervalInSeconds = 5 # fetch interval in seconds  
 
         # Get the last fetch time from shelve file store
         with shelve.open(self.shelve_name) as db: # handles the closing of the shelve file automatically with context manager
@@ -235,28 +194,26 @@ class Mattermost:
                 lastFetchTime = db['lastFetchTime']
             else:
                 lastFetchTime = 0
+            db.close()
         
         # calculate the time passed since lastFetchTIme
         timePassedInSeconds = (time() - lastFetchTime)
         print('Time passed since last fetch MAIN: ', timePassedInSeconds)
 
         if lastFetchTime == 0: # This are no posts in the database
-            print('get all posts for the first time')
+            print('Fetching all posts for the first time...')
             
             self.stop_sync() # cancel all previously scheduled events
             
-            self.scheduleFirstEvent(fetchIntervalInSeconds, authHeader, channels) # schedule the first event
+            self.scheduleFirstEvent(channels) # schedule the first event
             
             self.nextFetchScheduler.run() # run the scheduled events
         
-        else: 
-            print('Not the first time getting posts')
+        elif lastFetchTime != 0 and self.nextFetchScheduler.empty(): 
+            self.scheduleFirstEvent(channels)
+            self.nextFetchScheduler.run()   
 
-            if self.nextFetchScheduler.empty(): 
-                self.scheduleFirstEvent(fetchIntervalInSeconds, authHeader, channels)
-                self.nextFetchScheduler.run()   
-
-        if timePassedInSeconds < fetchIntervalInSeconds:
+        if timePassedInSeconds < self.fetchIntervalInSeconds:
             print("It's not time to fetch posts yet")
             
         return 'Synchronizing ...'
@@ -270,85 +227,55 @@ class Mattermost:
                 # print('event: ', event)
                 self.nextFetchScheduler.cancel(event)
 
-        print('isEmpty: ', self.nextFetchScheduler.empty())
+        print('The scheduler is ', 'empty!' if self.nextFetchScheduler.empty() else 'NOT empty!')
         return 'Stopped!'
     
-    # Privacy Feature in Mattermost
-
-    def get_user_teams(self, authHeader, userId):
-        teamRes = requests.get(
-            self.mmUrl + "/users/" + userId + "/teams",
-            headers={
-                "Content-type": "application/json; charset=UTF-8",
-                "Authorization": authHeader,
-            },
-        )
-
-        # Guard against bad requests
-        if teamRes.status_code != requests.codes.ok:
-            print("Get User's teams request failed with status code: ", teamRes.status_code)
-            return
-
-        return teamRes.json()
-
-    def get_channels_for_user_team(self, authHeader, userId, teamId):
-        userChannelsRes = requests.get(
-            self.mmUrl + "/users/" + userId + "/teams/" + teamId + "/channels",
-            headers={
-                "Content-type": "application/json; charset=UTF-8",
-                "Authorization": authHeader,
-            },
-        )
-
-        # Guard against bad requests
-        if userChannelsRes.status_code != requests.codes.ok:
-            print("Get User's teams request failed with status code: ", userChannelsRes.status_code)
-            return
-
-        return userChannelsRes.json()
     
-    def get_user_channels(self, user_id: str) -> [str]:
-        authHeader = "Bearer " + MM_PERSONAL_ACCESS_TOKEN
-        # user_id = login().json()['id']
+    def get_user_channels(self, user_id: str, *args: [str]) -> [str]:
+        """get the channel_ids for all the channels a user is a member of
 
-        teams = self.get_user_teams(authHeader, user_id)
+        Parameters
+        ----------
+        user_id : str
+            the user's id for whom we are fetching the channels
 
-        channels = []
-        for team in teams:
-            channel = self.get_channels_for_user_team(authHeader, user_id, team['id'])
-            channels.extend(channel)
+        Returns
+        -------
+        [str]
+            the list of channel ids
+        """
+        user_teams = self.mm_api_GET("/users/" + user_id + "/teams")
+        all_channels = []
 
-        channels = list({v['id']:v for v in channels}.values()) # make the channels list unique
+        for team in user_teams:
+            channels_in_team = self.mm_api_GET("/users/" + user_id + "/teams/" + team['id'] + "/channels")
+            all_channels.extend(channels_in_team)
 
-        print('Total Channels: ', len(channels))
+        all_channels = list({v['id']:v for v in all_channels}.values()) # make the channels list unique
 
-        return channels
+        print('Total no. of channels: ', len(all_channels))
+        
+        return [ch['id'] for ch in all_channels]
 
-    def get_user_details(self, user_id, *args):
+    def get_details(self, entity: str, mm_id: str, args: [str]):
+        """ Fetchs the details of the entity (user, channel, post) from Mattermost's API
+
+        Parameters
+        ----------
+        entity : str
+            the entity we want to get the details of
+        mm_id : str
+            the id of the entity provided by Mattermost
+        args : [str]
+            the list of fields we want to get from the response
+
+        Returns
+        -------
+        {"field": "value"}
+            _description_
+        """
         res = requests.get(
-            self.mmUrl + "/users/" + user_id,
-            headers={
-                "Content-type": "application/json; charset=UTF-8",
-                "Authorization": "Bearer " + MM_PERSONAL_ACCESS_TOKEN,
-            },
-        )
-
-        if res.status_code != requests.codes.ok:
-            print("Get user details request failed with status code: ", res.status_code)
-            return
-
-        user_details = res.json()
-        filtered_user_details = {}
-
-        for field in args:
-            filtered_user_details[field] = user_details[field]
-
-        return filtered_user_details
-        # return user_details.json()
-
-    def get_details(self, entity, mm_id, args):
-        res = requests.get(
-            f"{self.mmUrl}/{entity}/{mm_id}",
+            f"{self.mm_server_url}/{entity}/{mm_id}",
             headers={
                 "Content-type": "application/json; charset=UTF-8",
                 "Authorization": "Bearer " + MM_PERSONAL_ACCESS_TOKEN,
@@ -368,19 +295,19 @@ class Mattermost:
         return filtered_details
         # return details.json()
 
-    def get_user_details(self, user_id, *args):
+    def get_user_details(self, user_id: str, *args: [str]):
         print(self.get_details('users', user_id, args))
         return self.get_details('users', user_id, args)
 
-    def get_channel_details(self, channel_id, *args):
+    def get_channel_details(self, channel_id: str, *args: [str]):
         print(self.get_details('channels', channel_id, args))
         return self.get_details('channels', channel_id, args)
     
-    def get_post_details(self, post_id, *args):
+    def get_post_details(self, post_id: str, *args: [str]):
         print(self.get_details('posts', post_id, args))
         return self.get_details('posts', post_id, args)
 
-
+"""
 Mattermost().get_user_details('ioff979djbn97juwtkx9cizq9e', 'first_name', 'last_name', 'username', 'email')             # Admin
 Mattermost().get_user_details('r3dhbuhw9f8gjpwyexd7ex4iuy', 'first_name', 'last_name', 'username', 'email', 'is_bot')   # Feedback-bot
 
@@ -389,3 +316,8 @@ Mattermost().get_channel_details('z4kqay9m1jdxipatytm7eyteur', 'name', 'display_
 
 Mattermost().get_post_details('u95bn1e1kiyg8d98hor7rwupwh', 'message', 'type', 'channel_id', 'user_id')     # Hello
 Mattermost().get_post_details('e68a8f4gsjya7g4isfujyej1fe', 'message', 'type', 'channel_id', 'user_id')     # Channel join
+
+print( Mattermost().get_user_channels('ioff979djbn97juwtkx9cizq9e', 'id', 'type', 'name') )
+
+Mattermost().get_all_channels('id', 'name', 'total_msg_count')
+"""
