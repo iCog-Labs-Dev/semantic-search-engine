@@ -55,7 +55,7 @@ class TogetherLLM(LLM):
         
         return text
 
-    def start():
-        together.Models.start(TOGETHER_MODEL_NAME)
-    def stop():
-        together.Models.stop(TOGETHER_MODEL_NAME)
+    def start(self):
+        together.Models.start(self.model)
+    def stop(self):
+        together.Models.stop(self.model)
