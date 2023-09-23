@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+import shelve
 
 load_dotenv()
 
@@ -19,8 +20,29 @@ TOGETHER_API_KEY= os.environ.get("TOGETHER_API_KEY")
 TOGETHER_MODEL_NAME= os.environ.get("TOGETHER_MODEL_NAME") or "togethercomputer/llama-2-70b-chat"
 
 # Mattermost
-MM_SERVER_URL= os.environ.get("MM_SERVER_URL") or "http://localhost:8065/api/v4"
 MM_USER_NAME= os.environ.get("MM_USER_NAME") or "Admin"
 MM_PASSWORD= os.environ.get("MM_PASSWORD") or "password"
-MM_PERSONAL_ACCESS_TOKEN= os.environ.get("MM_PERSONAL_ACCESS_TOKEN")
-MM_FETCH_INTERVAL= os.environ.get("MM_FETCH_INTERVAL") or 5
+# MM_SERVER_URL= os.environ.get("MM_SERVER_URL") or "http://localhost:8065/api/v4"
+
+# Constants from shelve
+with shelve.open('mmUrl') as db:
+        if 'mmUrl' in db:
+            global mmAPI
+            mmAPI = db['mmUrl'] + '/api/v4'
+        else:
+            mmAPI = 'http://localhost:8065/api/v4'
+MM_SERVER_URL= mmAPI
+
+with shelve.open('interval') as db:
+    if 'interval' in db:
+        interval = db['interval']
+    else:
+        interval = 5
+MM_FETCH_INTERVAL= interval * 60 # fetch interval in seconds 
+
+with shelve.open('pat') as db:
+        if 'token' in db:
+            token = db['token']
+        else:
+            token = ''
+MM_PERSONAL_ACCESS_TOKEN= token

@@ -127,3 +127,61 @@ port_no = os.environ.get('PORT', 5555)
 
 print(f"Server running on port {port_no}....")
 app.run(port=int(port_no))
+
+
+# ************************************************************** /set-interval
+
+@app.route('/set-interval', methods=['POST'])
+def setInterval():
+    content_type = request.headers.get('Content-Type')
+    if (content_type == 'application/json'):
+        json = request.get_json()
+
+        if 'interval' not in json:
+            return 'Interval not provided!'
+
+        with shelve.open('interval') as db:
+            db['interval'] = json['interval']
+
+        return json
+    else:
+        return 'Content-Type not supported!'
+
+
+# ************************************************************** /set-personal-access-token
+
+@app.route('/set-personal-access-token', methods=['POST'])
+def setPersonalAccessToken():
+    content_type = request.headers.get('Content-Type')
+    if (content_type == 'application/json'):
+        json = request.get_json()
+
+        if 'token' not in json:
+            return 'Token not provided!'
+
+        with shelve.open('pat') as db:
+            db['token'] = json['token']
+
+        return 'The token is: ' + str(json)
+    else:
+        return 'Content-Type not supported!'
+
+
+# ************************************************************** /set-mattermost-url
+
+
+@app.route('/set-mattermost-url', methods=['POST'])
+def setMatterMostUrl():
+    content_type = request.headers.get('Content-Type')
+    if (content_type == 'application/json'):
+        json = request.get_json()
+
+        if 'mmUrl' not in json:
+            return 'Mattermost URL not provided!'
+
+        with shelve.open('mmUrl') as db:
+            db['mmUrl'] = json['mmUrl']
+
+        return json
+    else:
+        return 'Content-Type not supported!'
