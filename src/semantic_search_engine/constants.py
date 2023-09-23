@@ -14,6 +14,7 @@ CHROMA_COLLECTION = os.environ.get("SS_CHROMA_COLLECTION_NAME") or "messages"
 # Shelve
 MM_SHELVE_NAME= os.environ.get("MM_SHELVE_NAME") or "last_fetch_time"
 SLACK_SHELVE_NAME= os.environ.get("SLACK_SHELVE_NAME") or "slack_store"
+SETTINGS_SHELVE_NAME= os.environ.get("SETTINGS_SHELVE_NAME") or "settings"
 
 # LLM
 TOGETHER_API_KEY= os.environ.get("TOGETHER_API_KEY")
@@ -23,26 +24,11 @@ TOGETHER_MODEL_NAME= os.environ.get("TOGETHER_MODEL_NAME") or "togethercomputer/
 MM_USER_NAME= os.environ.get("MM_USER_NAME") or "Admin"
 MM_PASSWORD= os.environ.get("MM_PASSWORD") or "password"
 # MM_SERVER_URL= os.environ.get("MM_SERVER_URL") or "http://localhost:8065/api/v4"
+# MM_FETCH_INTERVAL= os.environ.get("MM_FETCH_INTERVAL") or 5
+# MM_PERSONAL_ACCESS_TOKEN= os.environ.get("MM_PERSONAL_ACCESS_TOKEN")
 
 # Constants from shelve
-with shelve.open('mmUrl') as db:
-        if 'mmUrl' in db:
-            global mmAPI
-            mmAPI = db['mmUrl'] + '/api/v4'
-        else:
-            mmAPI = 'http://localhost:8065/api/v4'
-MM_SERVER_URL= mmAPI
-
-with shelve.open('interval') as db:
-    if 'interval' in db:
-        interval = db['interval']
-    else:
-        interval = 5
-MM_FETCH_INTERVAL= interval * 60 # fetch interval in seconds 
-
-with shelve.open('pat') as db:
-        if 'token' in db:
-            token = db['token']
-        else:
-            token = ''
-MM_PERSONAL_ACCESS_TOKEN= token
+with shelve.open(SETTINGS_SHELVE_NAME) as settings:
+    MM_SERVER_URL= (settings['mattermost-url'] + '/api/v4') or 'http://localhost:8065/api/v4'
+    MM_FETCH_INTERVAL= (settings['fetch-interval'] * 60) or 5       # fetch interval in seconds 
+    MM_PERSONAL_ACCESS_TOKEN= settings['personal-access-token']
