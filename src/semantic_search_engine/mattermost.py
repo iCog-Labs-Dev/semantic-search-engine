@@ -3,7 +3,7 @@ from sched import scheduler
 import requests
 import shelve
 
-from semantic_search_engine.chroma import ChromaSingleton, ChromaCollection
+from semantic_search_engine.chroma import get_chroma_collection
 from semantic_search_engine.constants import CHROMA_COLLECTION
 from semantic_search_engine.constants import MM_USER_NAME, MM_PASSWORD, MM_PERSONAL_ACCESS_TOKEN, MM_SERVER_URL, MM_FETCH_INTERVAL, MM_SHELVE_NAME
 
@@ -174,10 +174,7 @@ class Mattermost:
                             }
                         }
                     '''
-                    collection = ChromaCollection().chroma_collection()
-                    # ChromaSingleton()\
-                    # .get_connection()\
-                    # .get_or_create_collection(CHROMA_COLLECTION)
+                    collection = get_chroma_collection()
     
                     collection.upsert(
                         ids=[post['id'] for post in filtered_posts],
@@ -202,7 +199,7 @@ class Mattermost:
         
         channels = self.get_all_channels('id', 'type') # get all channels
         # self.fetchIntervalInSeconds = 3 * 60 # fetch interval in seconds  
-        self.fetchIntervalInSeconds = 5 # fetch interval in seconds  
+        self.fetchIntervalInSeconds = 5 # fetch interval in seconds  # TODO
 
         # Get the last fetch time from shelve file store
         with shelve.open(self.shelve_name) as db: # handles the closing of the shelve file automatically with context manager

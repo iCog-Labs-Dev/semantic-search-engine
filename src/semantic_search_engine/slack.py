@@ -3,7 +3,7 @@ from zipfile import ZipFile
 import json
 import os
 import shelve
-import ijson
+# import ijson
 
 # each function needs to open and close the shelve file
 # d = shelve.open('shelve')

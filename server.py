@@ -7,10 +7,9 @@ from semantic_search_engine.mattermost import Mattermost
 # from semantic_search_engine.llm import TogetherLLM as together
 
 #Test
-from semantic_search_engine.chroma import ChromaCollection
-from semantic_search_engine.chroma import ChromaSingleton
+from semantic_search_engine.chroma import get_chroma_collection
 from semantic_search_engine import constants
-from semantic_search_engine.slack import extract_zip, channel, user, all_channels
+from semantic_search_engine.slack import extract_zip, channels, users, all_channels
 from io import BytesIO
 from semantic_search_engine.chroma import ChromaSingleton
 
@@ -29,13 +28,7 @@ def root_route():
 
 # =========== Test Chroma ===========
 @app.route('/chroma/<action>', methods=['GET'])
-def chroma_route(action):
-    # ChromaSingleton().\
-    #         get_connection().\
-    #         get_or_create_collection(
-    #             constants.CHROMA_COLLECTION,
-    #             embedding_function= embedding_functions.DefaultEmbeddingFunction()
-    #         ) 
+def chroma_route(action): 
     if action == 'query':
         return semantic_client.collection.query(
             query_texts=['Hello'],
@@ -105,9 +98,9 @@ def import_data():
 
     extract_zip(BytesIO(file))
 
-    channel()  # upload channels to shelve
+    channels()  # upload channels to shelve
  
-    user()  # upload users to shelve
+    users()  # upload users to shelve
 
     for msg in all_channels():
         semantic_client.collection.upsert(
