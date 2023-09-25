@@ -1,7 +1,6 @@
 from threading import Lock, Thread
 from semantic_search_engine import constants
 import chromadb
-from chromadb.utils import embedding_functions
 
 class _ChromaSingletonMeta(type):
     """A thread-safe implementation of a singleton class that creates chroma clients.\
@@ -81,15 +80,13 @@ class ChromaSingleton(metaclass=_ChromaSingletonMeta):
         return self._connection
 
 
-class ChromaCollection:
 
-    @staticmethod
-    def chroma_collection():
-        collection = ChromaSingleton().\
-            get_connection().\
-            get_or_create_collection(
-                constants.CHROMA_COLLECTION,
-                embedding_function= embedding_functions.DefaultEmbeddingFunction(),
-                metadata={"hnsw:space": "cosine"} 
-            )
-        return collection
+def get_chroma_collection(embedding_function, ):
+    collection = ChromaSingleton().\
+        get_connection().\
+        get_or_create_collection(
+            constants.CHROMA_COLLECTION,
+            embedding_function= embedding_function,
+            metadata={"hnsw:space": "cosine"} 
+        )
+    return collection

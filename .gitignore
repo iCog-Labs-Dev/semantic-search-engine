@@ -8,3 +8,4 @@ slackdata/
 archive/
 .env
 sqlite.db
+shelve

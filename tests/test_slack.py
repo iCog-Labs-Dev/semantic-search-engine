@@ -119,13 +119,12 @@ def make_dict_test(slf, dict_to_test):
             slf.assertEqual(d.get(_id)[k], v)
 
 def make_message_test(slf, msgs, results):
-        i = 0
-        for msg in msgs:
+        msgs = list(filter(lambda x : (x.get("client_msg_id") != None), msgs))
+        
+        for i,msg in enumerate(msgs):
             result = results[i]
-            subtype = msg.get("subtype")
-            if subtype not in [None, "channel_join"]: 
+            
+            if msg.get("client_msg_id", False): 
                 slf.assertEqual(result["text"], msg["text"], "text dont match")
-            else:
-                i -= 1  # dont move through result
-            i += 1
+
 

@@ -1,6 +1,6 @@
 from chromadb import EmbeddingFunction
 from semantic_search_engine.llm import TogetherLLM
-from semantic_search_engine.chroma import ChromaSingleton, ChromaCollection
+from semantic_search_engine.chroma import  get_chroma_collection
 from semantic_search_engine import constants
 from langchain import LLMChain, PromptTemplate
 from chromadb.utils import embedding_functions
@@ -59,7 +59,11 @@ class SemanticSearch():
                 verbose=True
                 # include the necessary output parser
             )
-   
+        
+
+        # Get or create a chroma collection
+        self.collection = get_chroma_collection(self.embedding_function)
+
     def semantic_search(self, query : str, user_id: str):
         """executes a semantic search on an LLM based on a certain query from a\
         vector db.
@@ -81,16 +85,9 @@ class SemanticSearch():
         channels_list = MM().get_user_channels(user_id=user_id)
         print(channels_list)
 
-        # Get or create a chroma collection
-        collection = ChromaCollection().chroma_collection()
-        ChromaSingleton().\
-            get_connection().\
-            get_or_create_collection(
-                constants.CHROMA_COLLECTION,
-                embedding_function= self.embedding_function
-            )     
+    
         
-        query_result = collection.query(
+        query_result = self.collection.query(
             query_texts=[query],
             n_results=100,
             # Get all messages from slack or specific channels that the user's a member of in MM
@@ -256,6 +253,8 @@ class SemanticSearchBuilder():
         SemanticSearch
             the built semantic search object
         """
+        self.collection = get_chroma_collection(self.ss.embedding_function)
+
         # update the chain
         self.chain = LLMChain(
                 llm=self.llm, 

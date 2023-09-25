@@ -1,4 +1,4 @@
-from flask import Flask, request
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
 import shelve
@@ -10,11 +10,14 @@ from semantic_search_engine.mattermost import Mattermost
 from semantic_search_engine.chroma import ChromaCollection
 from semantic_search_engine.chroma import ChromaSingleton
 from semantic_search_engine import constants
-
+from semantic_search_engine.slack import extract_zip, channel, user, all_channels
+from io import BytesIO
+from semantic_search_engine.chroma import ChromaSingleton
 
 app = Flask(__name__)
 CORS(app)
 
+semantic_client = SemanticSearch()
 # ************************************************************** /
 
 @app.route('/', methods=['GET'])
@@ -27,7 +30,6 @@ def root_route():
 # =========== Test Chroma ===========
 @app.route('/chroma/<action>', methods=['GET'])
 def chroma_route(action):
-    collection = ChromaCollection().chroma_collection()
     # ChromaSingleton().\
     #         get_connection().\
     #         get_or_create_collection(
@@ -35,7 +37,7 @@ def chroma_route(action):
     #             embedding_function= embedding_functions.DefaultEmbeddingFunction()
     #         ) 
     if action == 'query':
-        return collection.query(
+        return semantic_client.collection.query(
             query_texts=['Hello'],
             n_results=100
             # Get all messages from slack or specific channels that the user's a member of in MM
@@ -72,7 +74,7 @@ def semantic_search():
         query = request.json['query']
         user_id = request.json['user_id']
 
-        return SemanticSearch().semantic_search(query=query, user_id=user_id)
+        return semantic_client.semantic_search(query=query, user_id=user_id)
     
 # ************************************************************** /start-sync
     
@@ -91,10 +93,35 @@ def stop_sync():
     return 'Stopped sync!'
 
 # ************************************************************** /slack
-@app.route('/slack', methods=['GET', 'POST'])
-def upsert_slack():
-    pass
-    # TODO: upsert slack data from file to chroma
+@app.route('/import-data', methods= ['POST'])
+def import_data():
+    
+    if "zip_file" not in request.files:
+        return jsonify({
+            "error" : "File Not Sent"
+        })
+    
+    file = request.files["zip_file"]
+
+    extract_zip(BytesIO(file))
+
+    channel()  # upload channels to shelve
+ 
+    user()  # upload users to shelve
+
+    for msg in all_channels():
+        semantic_client.collection.upsert(
+            id = msg["id"],
+            documents= [msg["text"]],
+            metadatas= [
+                {
+                    "platform" : "sl",
+                    "access" : "pub",
+                    "channel_id" : msg["channel"],
+                    "user_id" : msg["user"]
+                }
+            ]
+        )
 
 
 # ************************************************************** /reset-all
@@ -105,7 +132,8 @@ def reset_all(action):
     if action=='mattermost' or action=='all':
         # Delete the chroma collection
         try:
-            ChromaSingleton().get_connection().delete_collection(name=constants.CHROMA_COLLECTION)
+            # ChromaSingleton().get_connection().delete_collection(name=constants.CHROMA_COLLECTION)
+            semantic_client.collection.delete()
             print(f'Chroma collection "{constants.CHROMA_COLLECTION}" deleted!')
             # Delete mattermost shelve store
             with shelve.open(constants.MM_SHELVE_NAME) as db:

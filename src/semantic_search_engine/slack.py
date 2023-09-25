@@ -1,7 +1,9 @@
+import itertools
 from zipfile import ZipFile
 import json
 import os
 import shelve
+import ijson
 
 # each function needs to open and close the shelve file
 # d = shelve.open('shelve')
@@ -76,8 +78,7 @@ def channels(d : shelve.Shelf | None = None):
         d[c['id']] = c
         channels.append(c['id'])
     # list of channels for later reference
-    d['channels'] = channels
-
+    d['channels'] = channels          
 
 @shelve_open_decorator
 def channel_messages(channel_id :str, json_obj : [dict], d : shelve.Shelf | None = None):
@@ -96,13 +97,20 @@ def channel_messages(channel_id :str, json_obj : [dict], d : shelve.Shelf | None
         extracted list of messages from a single channel file
     """
     messages = []
+    if not d.get("messages"):
+        d["messages"] = []
+
     for message in json_obj:
         # subtype == channel_join is a system message that tells a users has joined a channel, not really necessary
-        if not ('subtype' in message and message['subtype'] == 'channel_join'):
+        if message.get("client_msg_id", False):
             m = {}
             # more stuff can be extracted here but these are the essentials
-            m['text'] = message['text']
+            m["id"] = message["client_msg_id"]
             m['user'] = message['user']
+
+            d["messages"].append(m) 
+            
+            m['text'] = message['text']
             m['time'] = message['ts']
             m['channel'] = channel_id
             m['visibility'] = d[channel_id]['type']
@@ -152,3 +160,18 @@ def all_channels(d : shelve.Shelf | None = None):
         # this is assuming that we need messages in a single list but this is open to change
         all_messages += channel_dir(channel_id, d = d)
     return all_messages
+
+
+# accessor functions
+
+@shelve_open_decorator
+def get_user(user_id : str, d : shelve.Shelf | None = None) -> dict | None:
+    return d.get(user_id)
+
+@shelve_open_decorator
+def get_channel(channel_id : str, d : shelve.Shelf | None = None) -> dict | None:
+    return d.get(channel_id)
+
+@shelve_open_decorator
+def get_message(message_id : str, d : shelve.Shelf | None = None) -> dict | None:
+    return d.get("messages", {}).get(message_id)
