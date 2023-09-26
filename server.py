@@ -4,10 +4,8 @@ import os
 import shelve
 from semantic_search_engine.semantic_search import SemanticSearch
 from semantic_search_engine.mattermost import Mattermost
-# from semantic_search_engine.llm import TogetherLLM as together
 
 #Test
-from semantic_search_engine.chroma import get_chroma_collection
 from semantic_search_engine import constants
 from semantic_search_engine.slack import extract_zip, channels, users, all_channels
 from io import BytesIO
@@ -17,6 +15,7 @@ app = Flask(__name__)
 CORS(app)
 
 semantic_client = SemanticSearch()
+mattermost = Mattermost(semantic_client.collection)
 # ************************************************************** /
 
 @app.route('/', methods=['GET'])
@@ -32,21 +31,17 @@ def chroma_route(action):
     if action == 'query':
         return semantic_client.collection.query(
             query_texts=['Hello'],
-            n_results=100
-            # Get all messages from slack or specific channels that the user's a member of in MM
-            # where = {
-            #     "$or" : [
-            #         {
-            #             "platform" : "sl"
-            #         },
-            #         # "$and" : [ { "access" : "private" } ]
-            #         {
-            #             "channel_id" : {
-            #                             "$in" : channels_list
-            #                             }
-            #         }
-            #     ]
-            # }
+            n_results=100,
+            where = {
+                "$or" : [
+                    {
+                        "platform" : { "$eq" : "sl" }
+                    },
+                    {
+                        "platform" : { "$eq" : "mm" }
+                    }
+                ]
+            }
         )
 
 
@@ -74,7 +69,7 @@ def semantic_search():
 @app.route('/start-sync', methods=['GET'])
 def start_sync():
     # together().start()
-    Mattermost().start_sync()
+    mattermost.start_sync()
     return 'Started sync!'
 
 # ************************************************************** /stop-sync
@@ -82,7 +77,7 @@ def start_sync():
 @app.route('/stop-sync', methods=['GET'])
 def stop_sync():
     # together().stop()
-    Mattermost().stop_sync()
+    mattermost.stop_sync()
     return 'Stopped sync!'
 
 # ************************************************************** /slack
@@ -121,7 +116,7 @@ def import_data():
 
 @app.route('/reset/<action>', methods=['GET', 'POST'])
 def reset_all(action):
-    Mattermost().stop_sync()
+    mattermost.stop_sync()
     if action=='mattermost' or action=='all':
         # Delete the chroma collection
         try:

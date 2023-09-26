@@ -3,11 +3,12 @@ from sched import scheduler
 import requests
 import shelve
 
-from semantic_search_engine.chroma import get_chroma_collection
-from semantic_search_engine.constants import CHROMA_COLLECTION
 from semantic_search_engine.constants import MM_USER_NAME, MM_PASSWORD, MM_PERSONAL_ACCESS_TOKEN, MM_SERVER_URL, MM_FETCH_INTERVAL, MM_SHELVE_NAME
 
 class Mattermost:
+
+    def __init__(self, collection) -> None:
+        self.collection = collection
 
     mm_server_url = MM_SERVER_URL
     fetchIntervalInSeconds = MM_FETCH_INTERVAL
@@ -16,25 +17,20 @@ class Mattermost:
     shelve_name = MM_SHELVE_NAME
 
     # authenticate a user (through the MM API)
-    def get_auth_token(self):
-        loginData = {
-                        "login_id": MM_USER_NAME,
-                        "password": MM_PASSWORD
-                    }
-        personal_access_token = MM_PERSONAL_ACCESS_TOKEN
-
-        if personal_access_token:
-            return personal_access_token
+    def __get_auth_token(self):
+        if MM_PERSONAL_ACCESS_TOKEN:
+            return MM_PERSONAL_ACCESS_TOKEN
         else:
             print('Warning: You\'re not using a Personal-Access-Token, your session might expire!')
             return requests.post(
                 self.mm_server_url + "/users/login",
-                json=loginData,
-                headers={"Content-type": "application/json; charset=UTF-8"},
+                json={ "login_id": MM_USER_NAME,
+                       "password": MM_PASSWORD },
+                headers={ "Content-type": "application/json; charset=UTF-8" },
             ).headers["token"]
 
     def mm_api_GET(self, route: str, params={}):
-        authHeader = "Bearer " + self.get_auth_token()
+        authHeader = "Bearer " + self.__get_auth_token()
 
         res = requests.get(
             self.mm_server_url + route,
@@ -70,9 +66,7 @@ class Mattermost:
         ) 
 
     def getPostsForAllChannels(self, scheduler, channels):
-        print('\n')
-        print('*'*50)
-        print('\n')
+        print(f"\n {'*'*50} \n")
         print('Fetching posts for all channels ...')
 
         # Register next schedule
@@ -149,8 +143,6 @@ class Mattermost:
                 # TODO: replace user handles with their real names
                 filtered_posts = []
                 
-                print(channel)
-                print(posts)
                 for post in posts:
                     print('POST ************** ', post)
                     if (post['type']=='') and (post['message']): # If the 'type' is empty, that means it's a normal message (instead of 'system_join_channel')
@@ -174,9 +166,8 @@ class Mattermost:
                             }
                         }
                     '''
-                    collection = get_chroma_collection()
-    
-                    collection.upsert(
+
+                    self.collection.upsert(
                         ids=[post['id'] for post in filtered_posts],
                         documents=[post['message'] for post in filtered_posts],
                         metadatas=[{**{'user_id': x}, 

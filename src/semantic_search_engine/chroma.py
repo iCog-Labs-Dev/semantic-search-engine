@@ -81,7 +81,7 @@ class ChromaSingleton(metaclass=_ChromaSingletonMeta):
 
 
 
-def get_chroma_collection(embedding_function, ):
+def get_chroma_collection(embedding_function):
     collection = ChromaSingleton().\
         get_connection().\
         get_or_create_collection(
