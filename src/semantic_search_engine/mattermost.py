@@ -86,7 +86,7 @@ class Mattermost:
                     params=postParams
                 )
 
-                fields = ['id', 'message', 'user_id', 'type', 'channel_id']
+                fields = ['id', 'message', 'user_id', 'type', 'delete_at', 'channel_id']
 
                 # Get the ids for all posts in the 'order' field and filter out each fields we want for each post
                 '''
@@ -125,14 +125,17 @@ class Mattermost:
                 elif channel["type"] == 'P':  access = 'pri'
                 else: continue
                 
-                # Filter out any channel join and other type messages. Also filter out any empty string messages (only images, audio, ...)
                 # TODO: filter out any stickers / emojis
                 # TODO: replace user handles with their real names
                 filtered_posts = []
                 
                 for post in posts:
                     print('POST ************** ', post)
-                    if (post['type']=='') and (post['message']): # If the 'type' is empty, that means it's a normal message (instead of 'system_join_channel')
+                    if post['delete_at'] > 0:
+                        self.collection.delete(ids=[post['id']])
+                        print('Message deleted!')
+                    # Filter out any channel join and other type messages. Also filter out any empty string messages (only images, audio, ...)
+                    elif (post['type']=='' and post['message']): # If the 'type' is empty, that means it's a normal message (instead of 'system_join_channel')
                         filtered_posts.append(post)
 
                 if filtered_posts:   # If the channel has any posts left

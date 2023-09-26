@@ -115,12 +115,13 @@ def import_data():
 # ************************************************************** /reset-all
 
 @app.route('/reset/<action>', methods=['GET', 'POST'])
-def reset_all(action):
+def reset_all(self, action):
     mattermost.stop_sync()
     if action=='mattermost' or action=='all':
         # Delete the chroma collection
         try:
             ChromaSingleton().get_connection().delete_collection(name=constants.CHROMA_COLLECTION)
+            self.semantic_client = SemanticSearch()
             # semantic_client.collection.delete()
             print(f'Chroma collection "{constants.CHROMA_COLLECTION}" deleted!')
             # Delete mattermost shelve store
@@ -153,14 +154,17 @@ def settings():
     } </h4></pre>'''
 
     elif request.method == 'POST':
-        mmURL = request.json['mattermost-url'] or ''
-        interval = request.json['fetch-interval'] or ''
-        pat = request.json['personal-access-token'] or ''
-
+        body = request.get_json()
+        
         with shelve.open(constants.SETTINGS_SHELVE_NAME) as settings:
-            settings['mattermost-url'] = mmURL
-            settings['fetch-interval'] = interval
-            settings['personal-access-token'] = pat
+            if 'mattermost-url' in body: 
+                settings['mattermost-url'] = body['mattermost-url']
+
+            if 'interval' in body: 
+                settings['fetch-interval'] = body['interval']
+                
+            if 'personal-access-token' in body:  
+                settings['personal-access-token'] = body['personal-access-token']
 
             print(dict(settings))
 
