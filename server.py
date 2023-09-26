@@ -120,8 +120,8 @@ def reset_all(action):
     if action=='mattermost' or action=='all':
         # Delete the chroma collection
         try:
-            # ChromaSingleton().get_connection().delete_collection(name=constants.CHROMA_COLLECTION)
-            semantic_client.collection.delete()
+            ChromaSingleton().get_connection().delete_collection(name=constants.CHROMA_COLLECTION)
+            # semantic_client.collection.delete()
             print(f'Chroma collection "{constants.CHROMA_COLLECTION}" deleted!')
             # Delete mattermost shelve store
             with shelve.open(constants.MM_SHELVE_NAME) as db:
@@ -139,16 +139,11 @@ def reset_all(action):
     
     return 'Reset Successful!'
 
-port_no = os.environ.get('PORT', 5555)
-
-print(f"Server running on port {port_no}....")
-app.run(port=int(port_no))
-
-
 # ************************************************************** /settings
 
 @app.route('/settings', methods=['GET', 'POST'])
 def settings():
+    print('sdfasf')
     if request.method == 'GET':
         return '''<pre><h4> Send a POST request: <br>
     {
@@ -167,4 +162,13 @@ def settings():
             settings['fetch-interval'] = interval
             settings['personal-access-token'] = pat
 
+            print(dict(settings))
+
         return 'Settings updated!'
+
+
+
+port_no = os.environ.get('PORT', 5555)
+
+print(f"Server running on port {port_no}....")
+app.run(port=int(port_no))

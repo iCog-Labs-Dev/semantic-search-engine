@@ -5,7 +5,7 @@ from semantic_search_engine import constants
 from langchain import LLMChain, PromptTemplate
 from chromadb.utils import embedding_functions
 from langchain.llms.base import LLM
-from semantic_search_engine.mattermost import Mattermost as MM
+from semantic_search_engine.mattermost import MattermostAPI as MM
 
 class SemanticSearch():
     """The entrypoint to the package that contains the necessary data to 
@@ -83,9 +83,7 @@ class SemanticSearch():
         """
         # TODO: if public or (MM && private && in:channels_list) or slack
         channels_list = MM().get_user_channels(user_id=user_id)
-        print(channels_list)
 
-    
         
         query_result = self.collection.query(
             query_texts=[query],
@@ -152,8 +150,9 @@ class SemanticSearch():
                     metadata['user_id'],
                     'first_name', 'last_name', 'username'
                     )
-                real_name = f"{mm_data['first_name']} {mm_data['last_name']}"
-                schema['user_name'] = real_name if real_name != ' ' else mm_data['username']                # 1. user_name
+                # real_name = f"{mm_data['first_name']} {mm_data['last_name']}"
+                # schema['user_name'] = real_name if real_name else mm_data['username']                
+                schema['user_name'] = mm_data['name']                                                       # 1. user_name
                 # schema['user_profile_link'] = ...                                                         # 2. user_profile_link
             
                 mm_data = MM().get_channel_details(
