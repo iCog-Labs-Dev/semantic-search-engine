@@ -3,56 +3,24 @@ from sched import scheduler
 import requests
 import shelve
 
-from semantic_search_engine.constants import MM_USER_NAME, MM_PASSWORD, MM_PERSONAL_ACCESS_TOKEN, MM_SERVER_URL, MM_FETCH_INTERVAL, MM_SHELVE_NAME
+from semantic_search_engine.constants import MM_USER_NAME, MM_PASSWORD, MM_PERSONAL_ACCESS_TOKEN, MM_SERVER_URL, MM_FETCH_INTERVAL, MM_SHELVE_NAME, MM_FETCH_INTERVAL
 
 class Mattermost:
 
     def __init__(self, collection) -> None:
         self.collection = collection
 
-    mm_server_url = MM_SERVER_URL
     fetchIntervalInSeconds = MM_FETCH_INTERVAL
     
     nextFetchScheduler = scheduler(time, sleep)
     shelve_name = MM_SHELVE_NAME
-
-    # authenticate a user (through the MM API)
-    def __get_auth_token(self):
-        if MM_PERSONAL_ACCESS_TOKEN:
-            return MM_PERSONAL_ACCESS_TOKEN
-        else:
-            print('Warning: You\'re not using a Personal-Access-Token, your session might expire!')
-            return requests.post(
-                self.mm_server_url + "/users/login",
-                json={ "login_id": MM_USER_NAME,
-                       "password": MM_PASSWORD },
-                headers={ "Content-type": "application/json; charset=UTF-8" },
-            ).headers["token"]
-
-    def mm_api_GET(self, route: str, params={}):
-        authHeader = "Bearer " + self.__get_auth_token()
-
-        res = requests.get(
-            self.mm_server_url + route,
-            params=params,
-            headers={
-                "Content-type": "application/json; charset=UTF-8",
-                "Authorization": authHeader,
-            },
-        )
-        
-        # Guard against bad requests
-        if res.status_code != requests.codes.ok:
-            raise Exception(f"Request to '{route}' failed with status code: ", res.status_code)
-            
-        return res.json()
 
     @staticmethod
     def select_fields(response, fields):
         return [{field: res[field] for field in fields} for res in response]
 
     def get_all_channels(self, *fields: [str]):
-        all_channels = self.mm_api_GET('/channels')
+        all_channels = mm_api_GET('/channels')
         return self.select_fields(all_channels, fields)
 
     def scheduleFirstEvent(self, channels):
@@ -113,7 +81,7 @@ class Mattermost:
             # Loop through all pages of posts for the channel
             while previousPostId != '':
                 # Get the server response for each page of posts
-                postsRes = self.mm_api_GET(
+                postsRes = mm_api_GET(
                     "/channels/" + channel["id"] + "/posts",
                     params=postParams
                 )
@@ -131,6 +99,25 @@ class Mattermost:
                     }
                 '''
                 posts = [ { field: postsRes['posts'][postId][field] for field in fields } for postId in postsRes['order'] ]
+
+                # try:
+                # for postId in postsRes['order']:
+                #     thread_res = mm_api_GET(
+                #         f"/posts/{postId}/thread"
+                #     )
+                #     thread = ''
+                #     for thread_post_id in thread_res['order']:
+                #         # '\n'.join( [thread_res['posts'][thread_post_id][field] for field in fields] )
+                #         thread_post = thread_res['posts'][thread_post_id]
+                #         post_user = self.get_user_details(thread_post['user_id'], 'first_name', 'last_name', 'username')
+                #         post_time = self.get_post_details(thread_post_id, 'time')
+                #         message = f"({ post_time['time'] }) { post_user['name'] }: { thread_post['user_id'] }"
+                #         thread += message + '\n'
+
+                #     print(thread)
+                # except: print('^'*60)
+
+
                 access = ''
                 
                 # Get the channel's access restriction (private / public)
@@ -190,7 +177,7 @@ class Mattermost:
         
         channels = self.get_all_channels('id', 'type') # get all channels
         # self.fetchIntervalInSeconds = 3 * 60 # fetch interval in seconds  
-        self.fetchIntervalInSeconds = 5 # fetch interval in seconds  # TODO
+        self.fetchIntervalInSeconds = MM_FETCH_INTERVAL # fetch interval in seconds  # TODO
 
         # Get the last fetch time from shelve file store
         with shelve.open(self.shelve_name) as db: # handles the closing of the shelve file automatically with context manager
@@ -233,7 +220,10 @@ class Mattermost:
 
         print('The scheduler is ', 'empty!' if self.nextFetchScheduler.empty() else 'NOT empty!')
         return 'Stopped!'
-    
+
+
+
+class MattermostAPI:
     
     def get_user_channels(self, user_id: str, *args: [str]) -> [str]:
         """get the channel_ids for all the channels a user is a member of
@@ -248,11 +238,11 @@ class Mattermost:
         [str]
             the list of channel ids
         """
-        user_teams = self.mm_api_GET("/users/" + user_id + "/teams")
+        user_teams = mm_api_GET("/users/" + user_id + "/teams")
         all_channels = []
 
         for team in user_teams:
-            channels_in_team = self.mm_api_GET("/users/" + user_id + "/teams/" + team['id'] + "/channels")
+            channels_in_team = mm_api_GET(f"/users/{user_id}/teams/{team['id']}/channels")
             all_channels.extend(channels_in_team)
 
         all_channels = list({v['id']:v for v in all_channels}.values()) # make the channels list unique
@@ -278,30 +268,24 @@ class Mattermost:
         {"field": "value"}
             _description_
         """
-        res = requests.get(
-            f"{self.mm_server_url}/{entity}/{mm_id}",
-            headers={
-                "Content-type": "application/json; charset=UTF-8",
-                "Authorization": "Bearer " + MM_PERSONAL_ACCESS_TOKEN,
-            },
-        )
+        details = mm_api_GET(f"/{entity}/{mm_id}")
 
-        if res.status_code != requests.codes.ok:
-            print(f"Get {entity} details request failed with status code: ", res.status_code)
-            return
-
-        details = res.json()
         filtered_details = {}
 
         for field in args:
             filtered_details[str(field)] = details[str(field)]
 
         return filtered_details
-        # return details.json()
 
     def get_user_details(self, user_id: str, *args: [str]):
-        print(self.get_details('users', user_id, args))
-        return self.get_details('users', user_id, args)
+        user_data = self.get_details('users', user_id, args)
+        print('(*)'*40)
+        try:
+            real_name = f"{user_data['first_name']} {user_data['last_name']}".strip()
+            user_data.update({ 'name' : real_name or user_data['username'] })
+        except: pass
+
+        return user_data
 
     def get_channel_details(self, channel_id: str, *args: [str]):
         print(self.get_details('channels', channel_id, args))
@@ -329,3 +313,34 @@ print( Mattermost().get_user_channels('ioff979djbn97juwtkx9cizq9e', 'id', 'type'
 
 Mattermost().get_all_channels('id', 'name', 'total_msg_count')
 """
+
+# authenticate a user (through the MM API)
+def __get_auth_token():
+    if MM_PERSONAL_ACCESS_TOKEN:
+        return MM_PERSONAL_ACCESS_TOKEN
+    else:
+        print('Warning: You\'re not using a Personal-Access-Token, your session might expire!')
+        return requests.post(
+            MM_SERVER_URL + "/users/login",
+            json={ "login_id": MM_USER_NAME,
+                    "password": MM_PASSWORD },
+            headers={ "Content-type": "application/json; charset=UTF-8" },
+        ).headers["token"]
+
+def mm_api_GET(route: str, params={}):
+    authHeader = "Bearer " + __get_auth_token()
+
+    res = requests.get(
+        MM_SERVER_URL + route,
+        params=params,
+        headers={
+            "Content-type": "application/json; charset=UTF-8",
+            "Authorization": authHeader,
+        },
+    )
+    
+    # Guard against bad requests
+    if res.status_code != requests.codes.ok:
+        raise Exception(f"Request to '{route}' failed with status code: ", res.status_code)
+        
+    return res.json()
