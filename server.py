@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+import threading
 import os
 import shelve
 from semantic_search_engine.semantic_search import SemanticSearch
@@ -20,8 +21,14 @@ mattermost = Mattermost(semantic_client.collection)
 
 @app.route('/', methods=['GET'])
 def root_route():
-    if request.method == 'GET':
-        return '''<h1>Hi ✋</h1>'''
+    # return '''<h1>Hi ✋</h1>'''
+    with shelve.open(constants.SETTINGS_SHELVE_NAME) as settings:
+        res = dict(settings)
+        res['is_syncing'] = mattermost.is_syncing()
+    with shelve.open(constants.FETCH_TIME_SHELVE_NAME) as fetch_time:
+        res['last_fetch_time'] = fetch_time[constants.FETCH_TIME_SHELVE_NAME]
+
+    return res
 
 
 
@@ -68,15 +75,17 @@ def semantic_search():
     
 @app.route('/start-sync', methods=['GET'])
 def start_sync():
-    # together().start()
-    mattermost.start_sync()
+    try:
+        sync_thread = threading.Thread(target=mattermost.start_sync)
+        sync_thread.start()
+    except: return 'Something went wrong!'
+
     return 'Started sync!'
 
 # ************************************************************** /stop-sync
  
 @app.route('/stop-sync', methods=['GET'])
 def stop_sync():
-    # together().stop()
     mattermost.stop_sync()
     return 'Stopped sync!'
 
@@ -115,28 +124,29 @@ def import_data():
 # ************************************************************** /reset-all
 
 @app.route('/reset/<action>', methods=['GET', 'POST'])
-def reset_all(self, action):
+def reset_all(action):
+    global mattermost
     mattermost.stop_sync()
     if action=='mattermost' or action=='all':
-        # Delete the chroma collection
         try:
-            ChromaSingleton().get_connection().delete_collection(name=constants.CHROMA_COLLECTION)
-            self.semantic_client = SemanticSearch()
-            # semantic_client.collection.delete()
+            # Delete the chroma collection
+            ChromaSingleton().get_connection().delete_collection(name=constants.CHROMA_COLLECTION)  # Delete the collection (to delete all data)
             print(f'Chroma collection "{constants.CHROMA_COLLECTION}" deleted!')
-            # Delete mattermost shelve store
-            with shelve.open(constants.MM_SHELVE_NAME) as db:
-                db[constants.MM_SHELVE_NAME] = 0
-                # del db
-                print('Mattermost shelve reset!')
+            
+            global semantic_client
+            semantic_client = SemanticSearch() # Create an empty collection
+            mattermost = Mattermost(semantic_client.collection) # Re-instantiate mattermost with the new collection
+
+            # Delete fetch time shelve store
+            with shelve.open(constants.FETCH_TIME_SHELVE_NAME) as fetch_time_shelve:
+                del fetch_time_shelve[constants.FETCH_TIME_SHELVE_NAME]    # Delete the field within the shelve store
+                print('Fetch time shelve deleted!')
         except:
-            print(f'No collection named {constants.CHROMA_COLLECTION} detected or the shelve "{constants.MM_SHELVE_NAME}" doesn\'t exist')
+            print(f'No collection named {constants.CHROMA_COLLECTION} detected!')
 
     if action=='slack' or action=='all':
         pass
-        # TODO: Delete slack shelve store
-        '''with shelve.open(constants.SLACK_SHELVE_NAME) as db:
-        del db'''
+        # TODO: Delete slack db
     
     return 'Reset Successful!'
 
@@ -144,35 +154,38 @@ def reset_all(self, action):
 
 @app.route('/settings', methods=['GET', 'POST'])
 def settings():
-    print('sdfasf')
     if request.method == 'GET':
         return '''<pre><h4> Send a POST request: <br>
     {
-        "mattermost-url" : "the URL of the mattermost server",
+        "mattermost-api-url" : "the URL of the mattermost server",
         "fetch-interval" : "interval to sync messages (in minutes)",
         "personal-access-token": "the pesonal access token of an admin user"
     } </h4></pre>'''
 
     elif request.method == 'POST':
         body = request.get_json()
-        
-        with shelve.open(constants.SETTINGS_SHELVE_NAME) as settings:
-            if 'mattermost-url' in body: 
-                settings['mattermost-url'] = body['mattermost-url']
+        res = {}
 
-            if 'interval' in body: 
-                settings['fetch-interval'] = body['interval']
-                
+        with shelve.open(constants.SETTINGS_SHELVE_NAME) as settings:
+            if 'mattermost-api-url' in body: 
+                settings['mattermost-api-url'] = body['mattermost-api-url']
+
+            if 'fetch-interval' in body: 
+                settings['fetch-interval'] = body['fetch-interval']
+                mattermost.update_fetch_interval(int(settings['fetch-interval']))
+
             if 'personal-access-token' in body:  
                 settings['personal-access-token'] = body['personal-access-token']
 
-            print(dict(settings))
+            res = dict(settings)
 
-        return 'Settings updated!'
+        res['is_syncing'] = mattermost.is_syncing()
+
+        return res or 'Something went wrong!'
 
 
 
 port_no = os.environ.get('PORT', 5555)
 
-print(f"Server running on port {port_no}....")
-app.run(port=int(port_no))
+print(f"Server running on port {port_no}...")
+app.run(port=int(port_no), debug=True)
