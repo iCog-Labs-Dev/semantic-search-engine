@@ -3,17 +3,22 @@ from sched import scheduler
 import requests
 import shelve
 
-from semantic_search_engine.constants import MM_USER_NAME, MM_PASSWORD, MM_PERSONAL_ACCESS_TOKEN, MM_SERVER_URL, MM_FETCH_INTERVAL, MM_SHELVE_NAME, MM_FETCH_INTERVAL
+from semantic_search_engine.constants import MM_USER_NAME, MM_PASSWORD, MM_PERSONAL_ACCESS_TOKEN, MM_API_URL, FETCH_TIME_SHELVE_NAME, SETTINGS_SHELVE_NAME
 
 class Mattermost:
 
     def __init__(self, collection) -> None:
         self.collection = collection
 
-    fetchIntervalInSeconds = MM_FETCH_INTERVAL
+        with shelve.open(SETTINGS_SHELVE_NAME) as settings:
+            if 'fetch-interval' in settings:
+                self.fetchIntervalInSeconds = int(settings['fetch-interval']) or 5 
     
     nextFetchScheduler = scheduler(time, sleep)
-    shelve_name = MM_SHELVE_NAME
+    fetch_time_shelve = FETCH_TIME_SHELVE_NAME
+
+    def update_fetch_interval(self, interval):
+        self.fetchIntervalInSeconds = interval
 
     @staticmethod
     def select_fields(response, fields):
@@ -46,13 +51,13 @@ class Mattermost:
         )
 
         # Get the last fetch time from shelve file store
-        with shelve.open(self.shelve_name) as db: # handles the closing of the shelve file automatically with context manager
-            if self.shelve_name in db:
-                lastFetchTime = db[self.shelve_name]
+        with shelve.open(self.fetch_time_shelve) as db: # handles the closing of the shelve file automatically with context manager
+            if self.fetch_time_shelve in db:
+                lastFetchTime = db[self.fetch_time_shelve]
             else:
                 lastFetchTime = 0
             # Set the last fetch time to the current time for next api call
-            db[self.shelve_name] = time()
+            db[self.fetch_time_shelve] = time()
         db.close()  # Close the shelve just in case
 
         # calculate the time passed since lastFetchTIme
@@ -179,13 +184,11 @@ class Mattermost:
         print('Starting mattermost data sync ...')
         
         channels = self.get_all_channels('id', 'type') # get all channels
-        # self.fetchIntervalInSeconds = 3 * 60 # fetch interval in seconds  
-        self.fetchIntervalInSeconds = MM_FETCH_INTERVAL # fetch interval in seconds  # TODO
 
         # Get the last fetch time from shelve file store
-        with shelve.open(self.shelve_name) as db: # handles the closing of the shelve file automatically with context manager
-            if self.shelve_name in db:
-                lastFetchTime = db[self.shelve_name]
+        with shelve.open(self.fetch_time_shelve) as db: # handles the closing of the shelve file automatically with context manager
+            if self.fetch_time_shelve in db:
+                lastFetchTime = db[self.fetch_time_shelve]
             else:
                 lastFetchTime = 0
             db.close()
@@ -221,9 +224,11 @@ class Mattermost:
                 # print('event: ', event)
                 self.nextFetchScheduler.cancel(event)
 
-        print('The scheduler is ', 'empty!' if self.nextFetchScheduler.empty() else 'NOT empty!')
+        print('The scheduler is', 'empty!' if self.nextFetchScheduler.empty() else 'NOT empty!')
         return 'Stopped!'
 
+    def is_syncing(self):
+        return not self.nextFetchScheduler.empty()
 
 
 class MattermostAPI:
@@ -324,7 +329,7 @@ def __get_auth_token():
     else:
         print('Warning: You\'re not using a Personal-Access-Token, your session might expire!')
         return requests.post(
-            MM_SERVER_URL + "/users/login",
+            MM_API_URL + "/users/login",
             json={ "login_id": MM_USER_NAME,
                     "password": MM_PASSWORD },
             headers={ "Content-type": "application/json; charset=UTF-8" },
@@ -334,7 +339,7 @@ def mm_api_GET(route: str, params={}):
     authHeader = "Bearer " + __get_auth_token()
 
     res = requests.get(
-        MM_SERVER_URL + route,
+        MM_API_URL + route,
         params=params,
         headers={
             "Content-type": "application/json; charset=UTF-8",
