@@ -4,11 +4,11 @@ import threading
 import os
 import shelve
 from semantic_search_engine.semantic_search import SemanticSearch
-from semantic_search_engine.mattermost import Mattermost
+from semantic_search_engine.mattermost.mattermost import Mattermost
 
 #Test
 from semantic_search_engine import constants
-from semantic_search_engine.slack import extract_zip, channels, users, all_channels
+# from semantic_search_engine.slack.slack import extract_zip, channels, users, all_channels
 from io import BytesIO
 from semantic_search_engine.chroma import ChromaSingleton
 
@@ -90,63 +90,68 @@ def stop_sync():
     return 'Stopped sync!'
 
 # ************************************************************** /slack
-@app.route('/import-data', methods= ['POST'])
-def import_data():
+# @app.route('/import-data', methods= ['POST'])
+# def import_data():
     
-    if "zip_file" not in request.files:
-        return jsonify({
-            "error" : "File Not Sent"
-        })
+#     if "zip_file" not in request.files:
+#         return jsonify({
+#             "error" : "File Not Sent"
+#         })
     
-    file = request.files["zip_file"]
+#     file = request.files["zip_file"]
 
-    extract_zip(BytesIO(file))
+#     extract_zip(BytesIO(file))
 
-    channels()  # upload channels to shelve
+#     channels()  # upload channels to shelve
  
-    users()  # upload users to shelve
+#     users()  # upload users to shelve
 
-    for msg in all_channels():
-        semantic_client.collection.upsert(
-            id = msg["id"],
-            documents= [msg["text"]],
-            metadatas= [
-                {
-                    "platform" : "sl",
-                    "access" : "pub",
-                    "channel_id" : msg["channel"],
-                    "user_id" : msg["user"]
-                }
-            ]
-        )
+#     for msg in all_channels():
+#         semantic_client.collection.upsert(
+#             id = msg["id"],
+#             documents= [msg["text"]],
+#             metadatas= [
+#                 {
+#                     "platform" : "sl",
+#                     "access" : "pub",
+#                     "channel_id" : msg["channel"],
+#                     "user_id" : msg["user"]
+#                 }
+#             ]
+#         )
 
 
-# ************************************************************** /reset-all
+# ************************************************************** /reset
 
-@app.route('/reset/<action>', methods=['GET', 'POST'])
-def reset_all(action):
-    global mattermost
-    mattermost.stop_sync()
-    if action=='mattermost' or action=='all':
-        try:
-            # Delete the chroma collection
-            ChromaSingleton().get_connection().delete_collection(name=constants.CHROMA_COLLECTION)  # Delete the collection (to delete all data)
-            print(f'Chroma collection "{constants.CHROMA_COLLECTION}" deleted!')
-            
-            global semantic_client
-            semantic_client = SemanticSearch() # Create an empty collection
-            mattermost = Mattermost(semantic_client.collection) # Re-instantiate mattermost with the new collection
+@app.route('/reset', methods=['GET', 'POST'])
+def reset_all():
+    if request.method == 'GET':
+        return '''<pre><h4> Send a POST request: <br>
+    {
+        "mattermost" : True | False,
+        "slack" : True | False
+    } </h4></pre>'''
 
-            # Delete fetch time shelve store
-            with shelve.open(constants.FETCH_TIME_SHELVE_NAME) as fetch_time_shelve:
-                del fetch_time_shelve[constants.FETCH_TIME_SHELVE_NAME]    # Delete the field within the shelve store
-                print('Fetch time shelve deleted!')
-        except:
-            print(f'No collection named {constants.CHROMA_COLLECTION} detected!')
+    elif request.method == 'POST':
+        body = request.get_json()
 
-    if action=='slack' or action=='all':
-        pass
-        # TODO: Delete slack db
+        if body.get("mattermost", False):
+            mattermost.stop_sync()
+            try:
+                semantic_client.collection.delete(
+                    where={"platform" : "mm"}
+                )
+
+                # Delete fetch time shelve store
+                with shelve.open(constants.FETCH_TIME_SHELVE_NAME) as fetch_time_shelve:
+                    del fetch_time_shelve[constants.FETCH_TIME_SHELVE_NAME]    # Delete the field within the shelve store
+                    print('Fetch time shelve deleted!')
+            except:
+                print(f'No collection named {constants.CHROMA_COLLECTION} detected!')
+
+        if body.get("slack", False):
+            pass
+            # TODO: Delete slack db
     
     return 'Reset Successful!'
 
