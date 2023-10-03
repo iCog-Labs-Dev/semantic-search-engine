@@ -5,7 +5,7 @@ from semantic_search_engine import constants
 from langchain import LLMChain, PromptTemplate
 from chromadb.utils import embedding_functions
 from langchain.llms.base import LLM
-from semantic_search_engine.mattermost import MattermostAPI as MM
+from semantic_search_engine.mattermost.mattermost import MattermostAPI as MM
 
 class SemanticSearch():
     """The entrypoint to the package that contains the necessary data to 
