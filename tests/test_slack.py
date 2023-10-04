@@ -1,6 +1,6 @@
 import json
 import unittest
-from semantic_search_engine.slack import (
+from semantic_search_engine.slack.slack import (
     extract_zip, 
     users, 
     channels,

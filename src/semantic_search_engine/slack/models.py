@@ -33,7 +33,8 @@ class Channel (Model):
 
 # Create a schema for 'Channel'
 class Message (Model):
-   message_id=CharField( column_name='message_id') #, unique=True ) #TODO: should be unique... the gptgenerated channel has duplicate message_ids
+   #TODO: should be unique... the gptgenerated channel has duplicate message_ids
+   message_id=CharField( column_name='message_id') #, unique=True, primary_key=True ) ... TODO: this is not working
    user_id=ForeignKeyField( column_name='user_id', model=User, backref='messages' )
    channel_id=ForeignKeyField( column_name='channel_id', model=Channel, backref='messages' )
    text=TextField( column_name='text' )
