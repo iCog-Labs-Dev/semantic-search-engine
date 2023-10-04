@@ -58,20 +58,25 @@ class MattermostAPI:
 
     def get_user_details(self, user_id: str, *args: [str]):
         user_data = self.get_details('users', user_id, args)
-        print('(*)'*40)
         try:
-            real_name = f"{user_data['first_name']} {user_data['last_name']}".strip()
+            real_name = f"{user_data['first_name']} {user_data['last_name']}".strip()   # Just in case the user has no first and/or last names
             user_data.update({ 'name' : real_name or user_data['username'] })
         except: pass
 
         return user_data
 
     def get_channel_details(self, channel_id: str, *args: [str]):
-        print(self.get_details('channels', channel_id, args))
-        return self.get_details('channels', channel_id, args)
+        channel_data = self.get_details('channels', channel_id, args)
+        try:
+            display_name = channel_data['display_name']
+            channel_data.update({ 'name' : display_name or channel_data['name'] })      # Just in case the channel has no display name
+        except: pass
+        return channel_data
     
+    def get_team_details(self, team_id: str, *args: [str]):
+        return self.get_details('teams', team_id, args)
+
     def get_post_details(self, post_id: str, *args: [str]):
-        print(self.get_details('posts', post_id, args))
         return self.get_details('posts', post_id, args)
 
 # authenticate a user (through the MM API)
@@ -79,7 +84,7 @@ def __get_auth_token():
     if MM_PERSONAL_ACCESS_TOKEN:
         return MM_PERSONAL_ACCESS_TOKEN
     else:
-        print('Warning: You\'re not using a Personal-Access-Token, your session might expire!')
+        print('Warning: You\'re not using a Personal Access Token, your session might expire!')
         return requests.post(
             MM_API_URL + "/users/login",
             json={ "login_id": MM_USER_NAME,

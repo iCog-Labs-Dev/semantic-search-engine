@@ -2,8 +2,10 @@ from time import time, sleep
 from sched import scheduler
 import shelve
 
-from semantic_search_engine.constants import FETCH_TIME_SHELVE_NAME, SETTINGS_SHELVE_NAME
-from semantic_search_engine.mattermost.mm_api import *
+from semantic_search_engine.constants import FETCH_TIME_SHELVE_NAME, SETTINGS_SHELVE_NAME, CHROMA_COLLECTION
+from semantic_search_engine.mattermost.mm_api import MattermostAPI as MMApi
+from semantic_search_engine.mattermost.mm_api import mm_api_GET
+from datetime import datetime
 
 class Mattermost:
 
@@ -11,8 +13,8 @@ class Mattermost:
         self.collection = collection
 
         with shelve.open(SETTINGS_SHELVE_NAME) as settings:
-            if 'fetch-interval' in settings:
-                self.fetchIntervalInSeconds = int(settings['fetch-interval']) or 5 
+            if 'fetch_interval' in settings:
+                self.fetchIntervalInSeconds = int(settings['fetch_interval']) or 5 
     
     nextFetchScheduler = scheduler(time, sleep)
     fetch_time_shelve = FETCH_TIME_SHELVE_NAME
@@ -91,7 +93,7 @@ class Mattermost:
                     params=postParams
                 )
 
-                fields = ['id', 'message', 'user_id', 'type', 'delete_at', 'channel_id']
+                fields = ['id', 'message', 'user_id', 'type', 'update_at', 'delete_at', 'channel_id']
 
                 # Get the ids for all posts in the 'order' field and filter out each fields we want for each post
                 '''
@@ -137,10 +139,14 @@ class Mattermost:
                 for post in posts:
                     print('POST ************** ', post)
                     if post['delete_at'] > 0:
-                        self.collection.delete(ids=[post['id']])
+                        self.collection.delete(ids=[post['id']])    # Delete the message from Chroma
                         print('Message deleted!')
                     # Filter out any channel join and other type messages. Also filter out any empty string messages (only images, audio, ...)
                     elif (post['type']=='' and post['message']): # If the 'type' is empty, that means it's a normal message (instead of 'system_join_channel')
+                        user_details = MMApi().get_user_details(post['user_id'], 'first_name', 'last_name', 'username')
+                        # post['message'] = f"{ datetime(post['update_at'] / 1000).date() } { user_details['name'] }: { post['message'] }"
+                        # TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
+                        post['message'] = f"{ 'date' } { user_details['name'] }: { post['message'] }"
                         filtered_posts.append(post)
 
                 if filtered_posts:   # If the channel has any posts left
@@ -151,10 +157,10 @@ class Mattermost:
                         {
                             "id" : "message_id",
 
-                            "document" : "message_text",
+                            "document" : "(date) User: message_text",
 
                             "metadata" : {
-                                "platform": "sl / mm",
+                                "source": "sl / mm",
                                 "access" : "pri / pub",
                                 "channel_id" : "ch_sdfsa",
                                 "user_id" : "usr_dfsdf",
@@ -168,7 +174,7 @@ class Mattermost:
                         metadatas=[{**{'user_id': x}, 
                                     **{'channel_id': y},
                                     "access": access,
-                                    "platform":"mm"}  for x, y in zip(user_ids, channel_ids)]
+                                    "source":"mm"}  for x, y in zip(user_ids, channel_ids)]
                     )
 
                 # Update the page number and previousPostId for the next page of posts
@@ -230,3 +236,16 @@ class Mattermost:
     def is_syncing(self):
         return not self.nextFetchScheduler.empty()
 
+    def reset_mattermost(self):
+        self.stop_sync()
+        try:
+            self.collection.delete(
+                where={"source" : "mm"}
+            )
+
+            # Delete fetch time shelve store
+            with shelve.open(FETCH_TIME_SHELVE_NAME) as fetch_time_shelve:
+                del fetch_time_shelve[FETCH_TIME_SHELVE_NAME]    # Delete the field within the shelve store
+                print('Fetch time shelve deleted!')
+        except:
+            print(f'No collection named { CHROMA_COLLECTION } detected!')
