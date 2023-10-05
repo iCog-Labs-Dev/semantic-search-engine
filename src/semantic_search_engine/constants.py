@@ -6,42 +6,46 @@ load_dotenv()
 
 # Chroma
 DIR =  os.getcwd() #os.path.dirname(os.path.abspath(__file__))
-CHROMA_PATH = os.environ.get("SS_CHROMA_DB_PATH") or os.path.join(DIR, 'chroma_db')
+CHROMA_PATH = os.path.join(DIR, 'chroma_db')
+CHROMA_COLLECTION = "messages"
+    # The following are only required if chroma is running as a hosted instance
 CHROMA_HOST = os.environ.get("SS_CHROMA_DB_HOST") or "127.0.0.1"
 CHROMA_PORT = os.environ.get("SS_CHROMA_DB_PORT") or 5555
-CHROMA_COLLECTION = os.environ.get("SS_CHROMA_COLLECTION_NAME") or "messages"
 
-# Shelve
-FETCH_TIME_SHELVE_NAME= os.environ.get("FETCH_TIME_SHELVE_NAME") or "last_fetch_time"
-SETTINGS_SHELVE_NAME= os.environ.get("SETTINGS_SHELVE_NAME") or "settings"
-
-# LLM
-TOGETHER_API_KEY= os.environ.get("TOGETHER_API_KEY")
-TOGETHER_MODEL_NAME= os.environ.get("TOGETHER_MODEL_NAME") or "togethercomputer/llama-2-70b-chat"
-
-# Mattermost
-MM_USER_NAME= os.environ.get("MM_USER_NAME") or "Admin"
-MM_PASSWORD= os.environ.get("MM_PASSWORD") or "password"
-
-# Sqlite
-SQLITE_PATH = os.environ.get("SQLITE_PATH") or os.path.join(DIR, 'sqlite')
+# Slack Sqlite
+SQLITE_PATH = os.path.join(DIR, 'db')
 TEMP_SLACK_DATA_PATH = os.path.join(SQLITE_PATH, 'temp/')
 
-# Constants from shelve
-with shelve.open(SETTINGS_SHELVE_NAME) as settings:
-    if 'mattermost_api_url' in settings:
-        MM_API_URL= (settings['mattermost_api_url']) or "http://localhost:8065/api/v4"
-    else:
-        MM_API_URL= os.environ.get("MM_API_URL") or "http://localhost:8065/api/v4"
+# LLM       # TODO: We should use our own instance of a hosted LLM
+TOGETHER_API_KEY = os.environ.get("TOGETHER_API_KEY")
+TOGETHER_MODEL_NAME = os.environ.get("TOGETHER_MODEL_NAME") or "togethercomputer/llama-2-70b-chat"
 
-    if 'mattermost_url' in settings:
-        MM_URL= (settings['mattermost_url']) or "http://localhost:8065/"
-    else:
-        MM_URL= os.environ.get("MM_URL") or "http://localhost:8065/"
+# Mattermost    # TODO: Replace these with the client_id and client_secret required for oauth
+MM_USER_NAME = "Admin"
+MM_PASSWORD = "password"
 
-    # TODO: This should be removed
-    if 'personal_access_token' in settings:
-        MM_PERSONAL_ACCESS_TOKEN= settings['personal_access_token']
-    else:
-        MM_PERSONAL_ACCESS_TOKEN= os.environ.get("MM_PERSONAL_ACCESS_TOKEN") or ''
+# Defaults
+DEFAULT_FETCH_INTERVAL = 15 * 60    # Default fetch interval in minutes
+DEFAULT_LAST_FETCH_TIME = 0
+DEFAULT_CHROMA_N_RESULTS = 25
+
+# Shelve
+SHELVE_PATH = os.path.join(DIR, 'shelve')
+SHELVE_FIELD = 'value'
+
+LAST_FETCH_TIME_SHELVE = os.path.join(SHELVE_PATH, "last_fetch_time")
+FETCH_INTERVAL_SHELVE = os.path.join(SHELVE_PATH, "fetch_interval")
+MM_PAT_SHELVE = os.path.join(SHELVE_PATH, "personal_access_token")
+MM_API_URL_SHELVE = os.path.join(SHELVE_PATH, "mattermost_api_url")
+CHROMA_N_RESULTS_SHELVE = os.path.join(SHELVE_PATH, "chroma_n_results")
+# SETTINGS_SHELVE = os.path.join(SHELVE_PATH, "settings")
+
+# # Constants from shelve
+# with shelve.open(SETTINGS_SHELVE_NAME) as settings:
+#     MM_API_URL = settings['mattermost_api_url']
+
+#     CHROMA_N_RESULTS = settings['chroma_n_results']
+
+#     # TODO: This should be kept more securely
+#     MM_PERSONAL_ACCESS_TOKEN = settings['personal_access_token']
 
