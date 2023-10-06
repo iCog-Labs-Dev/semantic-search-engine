@@ -7,7 +7,7 @@ from semantic_search_engine.semantic_search import SemanticSearch
 from semantic_search_engine.mattermost.mattermost import Mattermost
 from semantic_search_engine.mattermost.mm_api import MattermostAPI as MM_Api
 from semantic_search_engine.slack.slack import Slack
-from semantic_search_engine.constants import FETCH_INTERVAL_SHELVE, SHELVE_FIELD, LAST_FETCH_TIME_SHELVE, MM_PAT_SHELVE, MM_API_URL_SHELVE, TEMP_SLACK_DATA_PATH
+from semantic_search_engine.constants import FETCH_INTERVAL_SHELVE, SHELVE_FIELD, LAST_FETCH_TIME_SHELVE, MM_PAT_SHELVE, MM_API_URL_SHELVE, CHROMA_N_RESULTS_SHELVE, TEMP_SLACK_DATA_PATH
 
 
 app = Flask(__name__)
@@ -42,7 +42,7 @@ def chroma_route(action):
     source = request.json['source']
     user_id = request.json['user_id']
 
-    channels_list = MM_Api().get_user_channels(user_id=user_id)
+    channels_list = MM_Api().get_user_channels(user_id=user_id) if source == 'mm' else ['']
 
     if action == 'query':
         res = semantic_client.collection.query(
@@ -75,7 +75,6 @@ def chroma_route(action):
 
 
 # ************************************************************** /search
-
 
 @app.route('/search', methods=['GET', 'POST'])
 def semantic_search():
@@ -131,7 +130,7 @@ def stop_sync():
             "is_syncing": mattermost.is_syncing()
         }
 
-# ************************************************************** /slack
+# ************************************************************** /upload-slack-zip
 @app.route('/upload-slack-zip', methods= ['POST'])
 def save_slack_zip():
     
@@ -149,7 +148,7 @@ def save_slack_zip():
     # TODO: should return list of channels
     return Response("{ 'message' : 'Successfully Extracted!' }", status=500, mimetype='application/json')
 
-# ************************************************************** /slack
+# ************************************************************** /import-slack-data
 
 @app.route('/import-slack-data', methods= ['POST'])
 def import_data():
@@ -216,10 +215,30 @@ def set_fetch_interval():
         if body.get("fetch_interval", False): 
             with shelve.open( FETCH_INTERVAL_SHELVE ) as fetch_interval_db:
                 fetch_interval_db[SHELVE_FIELD] = int( body['fetch_interval'] )
+                mattermost.update_fetch_interval(fetch_interval_db[SHELVE_FIELD])
                 return dict(fetch_interval_db)
         else:
             return 'Please provide a fetch interval!'
 
+# ************************************************************** /set_chroma_n_results
+
+@app.route('/set_chroma_n_results', methods=['GET', 'POST'])
+def set_chroma_n_results():
+    if request.method == 'GET':
+        return '''<pre><h4> Send a POST request: <br>
+    {
+        "chroma_n_results": "the no. of messages given to the LLM as context"
+    } </h4></pre>'''
+
+    elif request.method == 'POST':
+        body = request.get_json()
+
+        if body.get("chroma_n_results", False): 
+            with shelve.open( CHROMA_N_RESULTS_SHELVE ) as chroma_n_results_db:
+                chroma_n_results_db[SHELVE_FIELD] = int( body['chroma_n_results'] )
+                return dict(chroma_n_results_db)
+        else:
+            return 'Please provide the number of messages / results to be used as context!'
 
 
 port_no = os.environ.get('PORT', 5555)
