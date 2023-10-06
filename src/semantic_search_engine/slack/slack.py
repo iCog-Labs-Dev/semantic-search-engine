@@ -3,7 +3,6 @@ from zipfile import ZipFile
 from semantic_search_engine.slack.save import *
 from semantic_search_engine.slack.models import *
 from semantic_search_engine.constants import TEMP_SLACK_DATA_PATH
-import os
 
 class Slack:
 
