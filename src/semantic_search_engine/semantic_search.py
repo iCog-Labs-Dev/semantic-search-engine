@@ -1,13 +1,14 @@
 from chromadb import EmbeddingFunction
 from semantic_search_engine.llm import TogetherLLM
 from semantic_search_engine.chroma import  get_chroma_collection
-from semantic_search_engine.constants import MM_URL
+from semantic_search_engine.constants import MM_API_URL_SHELVE, CHROMA_N_RESULTS_SHELVE, SHELVE_FIELD
 from langchain import LLMChain, PromptTemplate
 from chromadb.utils import embedding_functions
 from langchain.llms.base import LLM
 from datetime import datetime
 from semantic_search_engine.mattermost.mm_api import MattermostAPI as MMApi
 from semantic_search_engine.slack.slack import Slack as Sl
+import shelve
 
 class SemanticSearch():
     """The entrypoint to the package that contains the necessary data to 
@@ -83,13 +84,16 @@ class SemanticSearch():
         str
             an explanation of for the query provided by the LLM
         """
-        # TODO: if public or (MM && private && in:channels_list) or slack
+        # Get the number of results to be returned by Chroma from shelve
+        with shelve.open(CHROMA_N_RESULTS_SHELVE) as chroma_n_results:
+            n_results = int(chroma_n_results[SHELVE_FIELD])
+        
+        # Get the channels list for the user from Mattermost's API
         channels_list = MMApi().get_user_channels(user_id=user_id)
-
         
         query_result = self.collection.query(
             query_texts=[query],
-            n_results=100,
+            n_results=n_results,
             # Get all messages from slack or specific channels that the user's a member of in MM
             where = 
                 {
@@ -108,20 +112,16 @@ class SemanticSearch():
                 }
         )
 
-        # context = []
-        # for msg in query_result["documents"][0]:
-        #     context.append('(date) Someone: ' + msg)
-
+        # Get the details for each user, channel and message returned from chroma
         details = self.get_metadata_details(query_result["ids"][0], query_result["metadatas"][0], query_result["distances"][0])
 
+        # Get the response from the LLM
         llm_response = self.chain.run(
             { 
                 "context" : '\n'.join( query_result["documents"][0] ),
                 "query" : query    
             }
         )
-
-        # print(llm_response, '\n', details)
 
         return {
             "llm": llm_response,
@@ -165,7 +165,15 @@ class SemanticSearch():
                     channel_data['team_id'],
                     'name'
                 )
-                link_url = f"{ MM_URL }/{ team_data['name'] }"
+
+                # Get the number of results to be returned by Chroma from shelve
+                with shelve.open(MM_API_URL_SHELVE) as mm_api_url:
+                    api_url = mm_api_url[SHELVE_FIELD]
+                
+                # Look for "api" from the right and cut out the url after that...  "http://localhost:8065/api/v4"  -->  "http://localhost:8065/"
+                mm_url = api_url[: api_url.rfind("api") ]
+                
+                link_url = f"{ mm_url }{ team_data['name'] }"
                 
                 # real_name = f"{mm_data['first_name']} {mm_data['last_name']}"
                 # schema['user_name'] = real_name if real_name else mm_data['username']                

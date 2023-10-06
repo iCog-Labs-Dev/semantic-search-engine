@@ -1,8 +1,14 @@
 
-from semantic_search_engine.constants import MM_USER_NAME, MM_PASSWORD, MM_PERSONAL_ACCESS_TOKEN, MM_API_URL, FETCH_TIME_SHELVE_NAME, SETTINGS_SHELVE_NAME
+from semantic_search_engine.constants import MM_USER_NAME, MM_PASSWORD, MM_PAT_SHELVE, SHELVE_FIELD, MM_API_URL_SHELVE
 import requests
+import shelve
 
 class MattermostAPI:
+
+    def __init__(self):
+        with shelve.open( MM_API_URL_SHELVE ) as mm_api_url_db:
+            # if mm_api_url_db.get( SHELVE_FIELD, False ):
+            self.mm_api_url = mm_api_url_db[SHELVE_FIELD]
     
     def get_user_channels(self, user_id: str, *args: [str]) -> [str]:
         """get the channel_ids for all the channels a user is a member of
@@ -17,11 +23,11 @@ class MattermostAPI:
         [str]
             the list of channel ids
         """
-        user_teams = mm_api_GET("/users/" + user_id + "/teams")
+        user_teams = self.mm_api_GET("/users/" + user_id + "/teams")
         all_channels = []
 
         for team in user_teams:
-            channels_in_team = mm_api_GET(f"/users/{user_id}/teams/{team['id']}/channels")
+            channels_in_team = self.mm_api_GET(f"/users/{user_id}/teams/{team['id']}/channels")
             all_channels.extend(channels_in_team)
 
         all_channels = list({v['id']:v for v in all_channels}.values()) # make the channels list unique
@@ -47,7 +53,7 @@ class MattermostAPI:
         {"field": "value"}
             _description_
         """
-        details = mm_api_GET(f"/{entity}/{mm_id}")
+        details = self.mm_api_GET(f"/{entity}/{mm_id}")
 
         filtered_details = {}
 
@@ -79,36 +85,37 @@ class MattermostAPI:
     def get_post_details(self, post_id: str, *args: [str]):
         return self.get_details('posts', post_id, args)
 
-# authenticate a user (through the MM API)
-def __get_auth_token():
-    if MM_PERSONAL_ACCESS_TOKEN:
-        return MM_PERSONAL_ACCESS_TOKEN
-    else:
-        print('Warning: You\'re not using a Personal Access Token, your session might expire!')
-        return requests.post(
-            MM_API_URL + "/users/login",
-            json={ "login_id": MM_USER_NAME,
-                    "password": MM_PASSWORD },
-            headers={ "Content-type": "application/json; charset=UTF-8" },
-        ).headers["token"]
+    # authenticate a user (through the MM API)
+    def __get_auth_token(self):
+        with shelve.open( MM_PAT_SHELVE ) as mm_personal_access_token:
+            if mm_personal_access_token.get( SHELVE_FIELD, False ):
+                return mm_personal_access_token[SHELVE_FIELD]
+            else:
+                print('Warning: You\'re not using a Personal Access Token, your session might expire!')
+                return requests.post(
+                    self.mm_api_url + "/users/login",
+                    json={ "login_id": MM_USER_NAME,
+                            "password": MM_PASSWORD },
+                    headers={ "Content-type": "application/json; charset=UTF-8" },
+                ).headers["token"]
 
-def mm_api_GET(route: str, params={}):
-    authHeader = "Bearer " + __get_auth_token()
+    def mm_api_GET(self, route: str, params={}):
+        authHeader = "Bearer " + self.__get_auth_token()
 
-    res = requests.get(
-        MM_API_URL + route,
-        params=params,
-        headers={
-            "Content-type": "application/json; charset=UTF-8",
-            "Authorization": authHeader,
-        },
-    )
-    
-    # Guard against bad requests
-    if res.status_code != requests.codes.ok:
-        raise Exception(f"Request to '{route}' failed with status code: ", res.status_code)
+        res = requests.get(
+            self.mm_api_url + route,
+            params=params,
+            headers={
+                "Content-type": "application/json; charset=UTF-8",
+                "Authorization": authHeader,
+            },
+        )
         
-    return res.json()
+        # Guard against bad requests
+        if res.status_code != requests.codes.ok:
+            raise Exception(f"Request to '{route}' failed with status code: ", res.status_code)
+            
+        return res.json()
 
 
 

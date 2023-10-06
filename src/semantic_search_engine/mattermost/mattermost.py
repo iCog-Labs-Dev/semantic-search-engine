@@ -2,9 +2,8 @@ from time import time, sleep
 from sched import scheduler
 import shelve
 
-from semantic_search_engine.constants import FETCH_TIME_SHELVE_NAME, SETTINGS_SHELVE_NAME, CHROMA_COLLECTION
+from semantic_search_engine.constants import DEFAULT_LAST_FETCH_TIME, FETCH_INTERVAL_SHELVE, LAST_FETCH_TIME_SHELVE, SHELVE_FIELD, MM_PAT_SHELVE
 from semantic_search_engine.mattermost.mm_api import MattermostAPI as MMApi
-from semantic_search_engine.mattermost.mm_api import mm_api_GET
 from datetime import datetime
 
 class Mattermost:
@@ -12,22 +11,25 @@ class Mattermost:
     def __init__(self, collection) -> None:
         self.collection = collection
 
-        with shelve.open(SETTINGS_SHELVE_NAME) as settings:
-            if 'fetch_interval' in settings:
-                self.fetchIntervalInSeconds = int(settings['fetch_interval']) or 5 
+        with shelve.open(FETCH_INTERVAL_SHELVE) as fetch_interval:
+            self.fetch_interval_in_seconds = int(fetch_interval[SHELVE_FIELD])
+
+        with shelve.open(LAST_FETCH_TIME_SHELVE) as last_fetch_time:
+            self.last_fetch_time = int(last_fetch_time[SHELVE_FIELD])
     
     nextFetchScheduler = scheduler(time, sleep)
-    fetch_time_shelve = FETCH_TIME_SHELVE_NAME
+    LAST_FETCH_TIME_SHELVE = LAST_FETCH_TIME_SHELVE
 
+    # For real-time update of the fetch interval (without reinstantiating the 'Mattermost' Class)
     def update_fetch_interval(self, interval):
-        self.fetchIntervalInSeconds = interval
+        self.fetch_interval_in_seconds = interval
 
     @staticmethod
     def select_fields(response, fields):
         return [{field: res[field] for field in fields} for res in response]
 
     def get_all_channels(self, *fields: [str]):
-        all_channels = mm_api_GET('/channels')
+        all_channels = MMApi().mm_api_GET('/channels')
         return self.select_fields(all_channels, fields)
 
     def scheduleFirstEvent(self, channels):
@@ -36,61 +38,52 @@ class Mattermost:
         self.nextFetchScheduler.enter(
             0,
             1, # priority
-            self.getPostsForAllChannels, # function to run when the event is triggered
+            self.get_posts_for_all_channels, # function to run when the event is triggered
             [self.nextFetchScheduler, channels] # arguments to pass to the function
         ) 
 
-    def getPostsForAllChannels(self, scheduler, channels):
+    def get_posts_for_all_channels(self, scheduler, channels):
         print(f"\n {'*'*50} \n")
         print('Fetching posts for all channels ...')
 
         # Register next schedule
         scheduler.enter(
-            self.fetchIntervalInSeconds, 
+            self.fetch_interval_in_seconds, 
             1, 
-            self.getPostsForAllChannels, 
+            self.get_posts_for_all_channels, 
             [scheduler, channels]
         )
 
-        # Get the last fetch time from shelve file store
-        with shelve.open(self.fetch_time_shelve) as db: # handles the closing of the shelve file automatically with context manager
-            if self.fetch_time_shelve in db:
-                lastFetchTime = db[self.fetch_time_shelve]
-            else:
-                lastFetchTime = 0
-            # Set the last fetch time to the current time for next api call
-            db[self.fetch_time_shelve] = time()
-        db.close()  # Close the shelve just in case
-
         # calculate the time passed since lastFetchTIme
-        timePassedInSeconds = (time() - lastFetchTime)
-        print('Time passed since last fetch: ', timePassedInSeconds)
+        time_passed_in_seconds = (time() - self.last_fetch_time)
+        print('Time passed since last fetch: ', time_passed_in_seconds)
 
-        postParams = {}
+        post_params = {}
 
-        # if timePassedInSeconds >= self.fetchIntervalInSeconds and lastFetchTime != 0:
-        if lastFetchTime != 0:
-            postParams = { 'since': int(lastFetchTime * 1000) } # convert to milliseconds
+        # if time_passed_in_seconds >= self.fetch_interval_in_seconds and last_fetch_time != 0:
+        if self.last_fetch_time != 0:
+            post_params = { 'since': int(self.last_fetch_time * 1000) } # convert to milliseconds
             print('get posts since last fetch time')
         
-        no_posts = 0
 
-        print('Request Params: ', postParams)
+        # Save the current time (before requesting the API)
+        current_time = time()
+        no_posts = 0
 
         for channel in channels:
             # 200 is the max number of posts per page
             # reset page to 0 for each channel
-            postParams.update({'per_page': 200, 'page': 0})
+            post_params.update({'per_page': 200, 'page': 0})
 
-            # previousPostId is used to check if there are more pages of posts
-            previousPostId = '~'
+            # previous_post_id is used to check if there are more pages of posts
+            previous_post_id = '~'
 
             # Loop through all pages of posts for the channel
-            while previousPostId != '':
+            while previous_post_id != '':
                 # Get the server response for each page of posts
-                postsRes = mm_api_GET(
+                posts_res = MMApi().mm_api_GET(
                     "/channels/" + channel["id"] + "/posts",
-                    params=postParams
+                    params=post_params
                 )
 
                 fields = ['id', 'message', 'user_id', 'type', 'update_at', 'delete_at', 'channel_id']
@@ -105,11 +98,11 @@ class Mattermost:
                                 "post_id_2": { ...2nd post details... }...  }
                     }
                 '''
-                posts = [ { field: postsRes['posts'][postId][field] for field in fields } for postId in postsRes['order'] ]
+                posts = [ { field: posts_res['posts'][postId][field] for field in fields } for postId in posts_res['order'] ]
 
                 # try:
-                # for postId in postsRes['order']:
-                #     thread_res = mm_api_GET(
+                # for postId in posts_res['order']:
+                #     thread_res = MMApi().mm_api_GET(
                 #         f"/posts/{postId}/thread"
                 #     )
                 #     thread = ''
@@ -144,9 +137,7 @@ class Mattermost:
                     # Filter out any channel join and other type messages. Also filter out any empty string messages (only images, audio, ...)
                     elif (post['type']=='' and post['message']): # If the 'type' is empty, that means it's a normal message (instead of 'system_join_channel')
                         user_details = MMApi().get_user_details(post['user_id'], 'first_name', 'last_name', 'username')
-                        # post['message'] = f"{ datetime(post['update_at'] / 1000).date() } { user_details['name'] }: { post['message'] }"
-                        # TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
-                        post['message'] = f"{ 'date' } { user_details['name'] }: { post['message'] }"
+                        post['message'] = f"({ datetime.utcfromtimestamp(post['update_at'] / 1000).date() }) { user_details['name'] }: { post['message'] }"
                         filtered_posts.append(post)
 
                 if filtered_posts:   # If the channel has any posts left
@@ -177,48 +168,55 @@ class Mattermost:
                                     "source":"mm"}  for x, y in zip(user_ids, channel_ids)]
                     )
 
-                # Update the page number and previousPostId for the next page of posts
-                postParams['page'] += 1
-                previousPostId = postsRes['prev_post_id']
+                # Update the page number and previous_post_id for the next page of posts
+                post_params['page'] += 1
+                previous_post_id = posts_res['prev_post_id']
                 no_posts += len(filtered_posts)
         
         print('Total posts fetched: ', no_posts)
-        # print(' *************************** All POSTS *************************** \n', posts)
+
+        # Update last_fetch_time in shelve store
+        with shelve.open(LAST_FETCH_TIME_SHELVE) as db: # handles the closing of the shelve file automatically with context manager
+            # Set the last fetch time to the current time for next api call
+            db[SHELVE_FIELD] = current_time
+            
+        # Update global last_fetch_time
+        self.last_fetch_time = current_time
 
 
     def start_sync(self):
         print('Starting mattermost data sync ...')
         
-        channels = self.get_all_channels('id', 'type') # get all channels
-
         # Get the last fetch time from shelve file store
-        with shelve.open(self.fetch_time_shelve) as db: # handles the closing of the shelve file automatically with context manager
-            if self.fetch_time_shelve in db:
-                lastFetchTime = db[self.fetch_time_shelve]
+        with shelve.open(LAST_FETCH_TIME_SHELVE) as db: # handles the closing of the shelve file automatically with context manager
+            if LAST_FETCH_TIME_SHELVE in db:
+                last_fetch_time = db[LAST_FETCH_TIME_SHELVE]
             else:
-                lastFetchTime = 0
+                last_fetch_time = 0
             db.close()
         
         # calculate the time passed since lastFetchTIme
-        timePassedInSeconds = (time() - lastFetchTime)
-        print('Time passed since last fetch MAIN: ', timePassedInSeconds)
+        time_passed_in_seconds = (time() - last_fetch_time)
+        print('Time passed since last fetch MAIN: ', time_passed_in_seconds)
 
-        if lastFetchTime == 0: # This are no posts in the database
+        all_channels = self.get_all_channels('id', 'type') # get all channels' id and type
+
+        if last_fetch_time == 0: # This are no posts in the database
             print('Fetching all posts for the first time...')
             
             self.stop_sync() # cancel all previously scheduled events
             
-            self.scheduleFirstEvent(channels) # schedule the first event
+            self.scheduleFirstEvent(all_channels) # schedule the first event
             
             self.nextFetchScheduler.run() # run the scheduled events
         
-        elif lastFetchTime != 0 and self.nextFetchScheduler.empty(): 
-            self.scheduleFirstEvent(channels)
+        elif last_fetch_time != 0 and self.nextFetchScheduler.empty(): 
+            self.scheduleFirstEvent(all_channels)
             self.nextFetchScheduler.run()   
 
-        if timePassedInSeconds < self.fetchIntervalInSeconds:
+        if time_passed_in_seconds < self.fetch_interval_in_seconds:
             print("It's not time to fetch posts yet")
-            
+
         return 'Synchronizing ...'
 
 
@@ -243,9 +241,9 @@ class Mattermost:
                 where={"source" : "mm"}
             )
 
-            # Delete fetch time shelve store
-            with shelve.open(FETCH_TIME_SHELVE_NAME) as fetch_time_shelve:
-                del fetch_time_shelve[FETCH_TIME_SHELVE_NAME]    # Delete the field within the shelve store
-                print('Fetch time shelve deleted!')
+            # Reset last_fetch_time in shelve store
+            with shelve.open(LAST_FETCH_TIME_SHELVE) as last_fetch_time:
+                last_fetch_time[SHELVE_FIELD] = DEFAULT_LAST_FETCH_TIME
+                print('Last fetch time reset!')
         except:
-            print(f'No collection named { CHROMA_COLLECTION } detected!')
+            print('No Chroma Collection!')
