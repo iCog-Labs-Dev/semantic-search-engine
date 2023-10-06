@@ -4,11 +4,13 @@ import threading
 import os
 import shelve
 from semantic_search_engine.semantic_search import SemanticSearch
-from semantic_search_engine.mattermost import Mattermost
+from semantic_search_engine.mattermost.mattermost import Mattermost
+from semantic_search_engine.mattermost.mm_api import MattermostAPI as MM_Api
+from semantic_search_engine.slack.slack import Slack
 
 #Test
 from semantic_search_engine import constants
-from semantic_search_engine.slack import extract_zip, channels, users, all_channels
+# from semantic_search_engine.slack.slack import extract_zip, channels, users, all_channels
 from io import BytesIO
 from semantic_search_engine.chroma import ChromaSingleton
 
@@ -16,7 +18,9 @@ app = Flask(__name__)
 CORS(app)
 
 semantic_client = SemanticSearch()
-mattermost = Mattermost(semantic_client.collection)
+collection = semantic_client.collection
+mattermost = Mattermost(collection)
+slack = Slack(collection)
 # ************************************************************** /
 
 @app.route('/', methods=['GET'])
@@ -26,30 +30,46 @@ def root_route():
         res = dict(settings)
         res['is_syncing'] = mattermost.is_syncing()
     with shelve.open(constants.FETCH_TIME_SHELVE_NAME) as fetch_time:
-        res['last_fetch_time'] = fetch_time[constants.FETCH_TIME_SHELVE_NAME]
+        res['last_fetch_time'] = fetch_time[constants.FETCH_TIME_SHELVE_NAME] * 1000
 
     return res
 
-
-
 # =========== Test Chroma ===========
-@app.route('/chroma/<action>', methods=['GET'])
-def chroma_route(action): 
+# TODO: remove this endpoint
+@app.route('/chroma/<action>', methods=['POST'])
+def chroma_route(action):
+    query = request.json['query']
+    n_results = request.json['n_results']
+    source = request.json['source']
+    user_id = request.json['user_id']
+
+    channels_list = MM_Api().get_user_channels(user_id=user_id)
+
     if action == 'query':
-        return semantic_client.collection.query(
-            query_texts=['Hello'],
-            n_results=100,
-            where = {
-                "$or" : [
-                    {
-                        "platform" : { "$eq" : "sl" }
-                    },
-                    {
-                        "platform" : { "$eq" : "mm" }
+        res = semantic_client.collection.query(
+                query_texts=[query],
+                n_results=n_results,
+                where = {
+                    "$or": [
+                            {
+                                "access": {
+                                    "$eq": "pub"
+                                }
+                            },
+                            {
+                                "channel_id": {
+                                    "$in": channels_list
+                                }
+                            },
+                            {
+                            "source" : { "$eq" : source }
+                            }
+                        ]
                     }
-                ]
-            }
-        )
+            )
+        res['alist'] = channels_list
+    
+        return res
 
 
 # ************************************************************** /search
@@ -90,63 +110,51 @@ def stop_sync():
     return 'Stopped sync!'
 
 # ************************************************************** /slack
-@app.route('/import-data', methods= ['POST'])
-def import_data():
-    
-    if "zip_file" not in request.files:
+@app.route('/upload-slack-zip', methods= ['POST'])
+def save_slack_zip():
+    temp_path = constants.TEMP_SLACK_DATA_PATH
+    file_path = os.path.join(temp_path, 'slack-export-data.zip')
+
+    if "file" not in request.files:
         return jsonify({
             "error" : "File Not Sent"
         })
     
-    file = request.files["zip_file"]
+    os.makedirs(temp_path, exist_ok=True)
+    file = request.files["file"]
 
-    extract_zip(BytesIO(file))
+    file.save(file_path)            # Save the zip file
+    slack.extract_zip(file_path)    # Extract it
+    os.remove(file_path)            # Delete the zip file
 
-    channels()  # upload channels to shelve
- 
-    users()  # upload users to shelve
+    # TODO: should return list of channels
+    return 'Extracted!'
 
-    for msg in all_channels():
-        semantic_client.collection.upsert(
-            id = msg["id"],
-            documents= [msg["text"]],
-            metadatas= [
-                {
-                    "platform" : "sl",
-                    "access" : "pub",
-                    "channel_id" : msg["channel"],
-                    "user_id" : msg["user"]
-                }
-            ]
-        )
+@app.route('/import-slack-data', methods= ['POST'])
+def import_data():
+    slack.import_slack_data()
 
+    return 'Imported!'
 
-# ************************************************************** /reset-all
+# ************************************************************** /reset
 
-@app.route('/reset/<action>', methods=['GET', 'POST'])
-def reset_all(action):
-    global mattermost
-    mattermost.stop_sync()
-    if action=='mattermost' or action=='all':
-        try:
-            # Delete the chroma collection
-            ChromaSingleton().get_connection().delete_collection(name=constants.CHROMA_COLLECTION)  # Delete the collection (to delete all data)
-            print(f'Chroma collection "{constants.CHROMA_COLLECTION}" deleted!')
-            
-            global semantic_client
-            semantic_client = SemanticSearch() # Create an empty collection
-            mattermost = Mattermost(semantic_client.collection) # Re-instantiate mattermost with the new collection
+@app.route('/reset', methods=['GET', 'POST'])
+def reset_all():
+    if request.method == 'GET':
+        return '''<pre><h4> Send a POST request: <br>
+    {
+        "mattermost" : true | false,
+        "slack" : true | false
+    } </h4></pre>'''
 
-            # Delete fetch time shelve store
-            with shelve.open(constants.FETCH_TIME_SHELVE_NAME) as fetch_time_shelve:
-                del fetch_time_shelve[constants.FETCH_TIME_SHELVE_NAME]    # Delete the field within the shelve store
-                print('Fetch time shelve deleted!')
-        except:
-            print(f'No collection named {constants.CHROMA_COLLECTION} detected!')
+    elif request.method == 'POST':
+        body = request.get_json()
 
-    if action=='slack' or action=='all':
-        pass
-        # TODO: Delete slack db
+        if body.get("mattermost", False):
+            mattermost.reset_mattermost()
+
+        if body.get("slack", False):
+            slack.reset_slack()
     
     return 'Reset Successful!'
 
@@ -157,9 +165,9 @@ def settings():
     if request.method == 'GET':
         return '''<pre><h4> Send a POST request: <br>
     {
-        "mattermost-api-url" : "the URL of the mattermost server",
-        "fetch-interval" : "interval to sync messages (in minutes)",
-        "personal-access-token": "the pesonal access token of an admin user"
+        "mattermost_api_url" : "the URL of the mattermost server",
+        "fetch_interval" : "interval to sync messages (in minutes)",
+        "personal_access_token": "the pesonal access token of an admin user"
     } </h4></pre>'''
 
     elif request.method == 'POST':
@@ -167,15 +175,18 @@ def settings():
         res = {}
 
         with shelve.open(constants.SETTINGS_SHELVE_NAME) as settings:
-            if 'mattermost-api-url' in body: 
-                settings['mattermost-api-url'] = body['mattermost-api-url']
+            if 'mattermost_api_url' in body: 
+                settings['mattermost_api_url'] = body['mattermost_api_url']
+            
+            if 'mattermost_url' in body: 
+                settings['mattermost_url'] = body['mattermost_url']
 
-            if 'fetch-interval' in body: 
-                settings['fetch-interval'] = body['fetch-interval']
-                mattermost.update_fetch_interval(int(settings['fetch-interval']))
+            if 'fetch_interval' in body: 
+                settings['fetch_interval'] = body['fetch_interval']
+                mattermost.update_fetch_interval(int(settings['fetch_interval']))
 
-            if 'personal-access-token' in body:  
-                settings['personal-access-token'] = body['personal-access-token']
+            if 'personal_access_token' in body:  
+                settings['personal_access_token'] = body['personal_access_token']
 
             res = dict(settings)
 

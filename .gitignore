@@ -4,10 +4,13 @@ venv
 .vscode
 environment.py
 chroma_db/
-slackdata/
-archive/
+sqlite/
+temp/
+
 .env
 sqlite.db
 shelve
 last_fetch_time
 settings
+test
+test.*

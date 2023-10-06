@@ -1,11 +1,13 @@
 from chromadb import EmbeddingFunction
 from semantic_search_engine.llm import TogetherLLM
 from semantic_search_engine.chroma import  get_chroma_collection
-from semantic_search_engine import constants
+from semantic_search_engine.constants import MM_URL
 from langchain import LLMChain, PromptTemplate
 from chromadb.utils import embedding_functions
 from langchain.llms.base import LLM
-from semantic_search_engine.mattermost import MattermostAPI as MM
+from datetime import datetime
+from semantic_search_engine.mattermost.mm_api import MattermostAPI as MMApi
+from semantic_search_engine.slack.slack import Slack as Sl
 
 class SemanticSearch():
     """The entrypoint to the package that contains the necessary data to 
@@ -82,7 +84,7 @@ class SemanticSearch():
             an explanation of for the query provided by the LLM
         """
         # TODO: if public or (MM && private && in:channels_list) or slack
-        channels_list = MM().get_user_channels(user_id=user_id)
+        channels_list = MMApi().get_user_channels(user_id=user_id)
 
         
         query_result = self.collection.query(
@@ -110,7 +112,7 @@ class SemanticSearch():
         # for msg in query_result["documents"][0]:
         #     context.append('(date) Someone: ' + msg)
 
-        details = self.get_metadata_details(query_result["ids"][0], query_result["metadatas"][0], query_result["distances"][0], 'mm')
+        details = self.get_metadata_details(query_result["ids"][0], query_result["metadatas"][0], query_result["distances"][0])
 
         llm_response = self.chain.run(
             { 
@@ -128,54 +130,77 @@ class SemanticSearch():
 
 
     @staticmethod
-    def get_metadata_details(ids, metadatas, distances, datasource: str = "mm"):
+    def get_metadata_details(ids, metadatas, distances):
         response = []
 
         for idx, metadata in enumerate(metadatas):
             
             schema = {
                 "user_name":"",
-                "user_profile_link": "",
+                "user_dm_link": "",
                 "channel_name":"",
                 "channel_link":"",
                 "message":"",
                 "message_link":"",
                 "time":"",
-                "platform":"",
+                "source":"",
                 "access":"",
                 "score":""
             }
-            if datasource=='mm':
-                mm_data = MM().get_user_details(
+            if metadata['source']=='mm':
+                user_data = MMApi().get_user_details(
                     metadata['user_id'],
                     'first_name', 'last_name', 'username'
                     )
+                channel_data = MMApi().get_channel_details(
+                    metadata['channel_id'],
+                    'name', 'display_name', 'team_id'
+                    )
+
+                post_data = MMApi().get_post_details(
+                    ids[idx],
+                    'id', 'message', 'update_at' # create_at
+                    )
+                team_data = MMApi().get_team_details(
+                    channel_data['team_id'],
+                    'name'
+                )
+                link_url = f"{ MM_URL }/{ team_data['name'] }"
+                
                 # real_name = f"{mm_data['first_name']} {mm_data['last_name']}"
                 # schema['user_name'] = real_name if real_name else mm_data['username']                
-                schema['user_name'] = mm_data['name']                                                       # 1. user_name
-                # schema['user_profile_link'] = ...                                                         # 2. user_profile_link
-            
-                mm_data = MM().get_channel_details(
-                    metadata['channel_id'],
-                    'name', 'display_name'
-                    )
-                schema['channel_name'] = mm_data['name'] if mm_data['name'] else mm_data['display_name']    # 3. channel_name 
-                # schema['channel_link'] = 'url/teamname/channels/' + schema['channel_name']                # 4. channel_link 
-            
-                mm_data = MM().get_post_details(
-                    ids[idx],
-                    'message', 'update_at' # create_at
-                    )
-                schema['message'] = mm_data['message']                                                      # 5. message
-                # schema['message_link'] = ...                                                              # 6. message_link
-                schema['time'] = mm_data['update_at']                                                       # 7. time
+                schema['user_name'] = user_data['name']                                                     # 1. user_name
+                schema['user_dm_link'] = f"{ link_url }/messages/@{ user_data['username'] }"                # 2. user_dm_link
 
-                schema['platform'] = metadata['platform']                                                   # 8. platform
+                schema['channel_name'] = channel_data['name']                                               # 3. channel_name 
+                schema['channel_link'] = f"{ link_url }/channels/{ channel_data['name'] }"                  # 4. channel_link 
+            
+                schema['message'] = post_data['message']                                                    # 5. message
+                schema['message_link'] = f"{ link_url }/pl/{ post_data['id'] }"                             # 6. message_link
+                schema['time'] = (post_data['update_at']) / 1000                                            # 7. time
+
+                schema['source'] = metadata['source']                                                       # 8. source (mm)
                 schema['access'] = metadata['access']                                                       # 9. access
                 schema['score'] = 1 - distances[idx]                                                        # 10. score
             
-            elif datasource=='sl':
-                pass
+            elif metadata['source']=='sl':
+                sl_data = Sl.get_user_details( metadata['user_id'] )              
+                schema['user_name'] = sl_data['real_name'] or sl_data['name']                               # 1. user_name
+                # schema['user_dm_link'] = ...                                                              # 2. user_dm_link  (not applicable to slack)
+
+                sl_data = Sl.get_channel_details( metadata['channel_id'] )    
+                schema['channel_name'] = sl_data['name']                                                    # 3. channel_name 
+                # schema['channel_link'] = 'url/teamname/channels/' + schema['channel_name']                # 4. channel_link       (not applicable to slack)
+            
+                sl_data = Sl.get_message_details( ids[idx] )   
+                schema['message'] = sl_data['text']                                                         # 5. message
+                # schema['message_link'] = ...                                                              # 6. message_link       (not applicable to slack)
+                ts = round( datetime.timestamp( sl_data['time'] ) , 3)
+                schema['time'] = ts                                                                         # 7. time
+
+                schema['source'] = metadata['source']                                                       # 8. source (sl)
+                schema['access'] = metadata['access']                                                       # 9. access
+                schema['score'] = 1 - distances[idx]                                                        # 10. score
                 
             response.append(schema)
         

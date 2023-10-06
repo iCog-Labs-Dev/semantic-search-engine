@@ -1,9 +1,11 @@
 from time import time, sleep
 from sched import scheduler
-import requests
 import shelve
 
-from semantic_search_engine.constants import MM_USER_NAME, MM_PASSWORD, MM_PERSONAL_ACCESS_TOKEN, MM_API_URL, FETCH_TIME_SHELVE_NAME, SETTINGS_SHELVE_NAME
+from semantic_search_engine.constants import FETCH_TIME_SHELVE_NAME, SETTINGS_SHELVE_NAME, CHROMA_COLLECTION
+from semantic_search_engine.mattermost.mm_api import MattermostAPI as MMApi
+from semantic_search_engine.mattermost.mm_api import mm_api_GET
+from datetime import datetime
 
 class Mattermost:
 
@@ -11,8 +13,8 @@ class Mattermost:
         self.collection = collection
 
         with shelve.open(SETTINGS_SHELVE_NAME) as settings:
-            if 'fetch-interval' in settings:
-                self.fetchIntervalInSeconds = int(settings['fetch-interval']) or 5 
+            if 'fetch_interval' in settings:
+                self.fetchIntervalInSeconds = int(settings['fetch_interval']) or 5 
     
     nextFetchScheduler = scheduler(time, sleep)
     fetch_time_shelve = FETCH_TIME_SHELVE_NAME
@@ -91,7 +93,7 @@ class Mattermost:
                     params=postParams
                 )
 
-                fields = ['id', 'message', 'user_id', 'type', 'delete_at', 'channel_id']
+                fields = ['id', 'message', 'user_id', 'type', 'update_at', 'delete_at', 'channel_id']
 
                 # Get the ids for all posts in the 'order' field and filter out each fields we want for each post
                 '''
@@ -137,10 +139,14 @@ class Mattermost:
                 for post in posts:
                     print('POST ************** ', post)
                     if post['delete_at'] > 0:
-                        self.collection.delete(ids=[post['id']])
+                        self.collection.delete(ids=[post['id']])    # Delete the message from Chroma
                         print('Message deleted!')
                     # Filter out any channel join and other type messages. Also filter out any empty string messages (only images, audio, ...)
                     elif (post['type']=='' and post['message']): # If the 'type' is empty, that means it's a normal message (instead of 'system_join_channel')
+                        user_details = MMApi().get_user_details(post['user_id'], 'first_name', 'last_name', 'username')
+                        # post['message'] = f"{ datetime(post['update_at'] / 1000).date() } { user_details['name'] }: { post['message'] }"
+                        # TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
+                        post['message'] = f"{ 'date' } { user_details['name'] }: { post['message'] }"
                         filtered_posts.append(post)
 
                 if filtered_posts:   # If the channel has any posts left
@@ -151,10 +157,10 @@ class Mattermost:
                         {
                             "id" : "message_id",
 
-                            "document" : "message_text",
+                            "document" : "(date) User: message_text",
 
                             "metadata" : {
-                                "platform": "sl / mm",
+                                "source": "sl / mm",
                                 "access" : "pri / pub",
                                 "channel_id" : "ch_sdfsa",
                                 "user_id" : "usr_dfsdf",
@@ -168,7 +174,7 @@ class Mattermost:
                         metadatas=[{**{'user_id': x}, 
                                     **{'channel_id': y},
                                     "access": access,
-                                    "platform":"mm"}  for x, y in zip(user_ids, channel_ids)]
+                                    "source":"mm"}  for x, y in zip(user_ids, channel_ids)]
                     )
 
                 # Update the page number and previousPostId for the next page of posts
@@ -230,125 +236,16 @@ class Mattermost:
     def is_syncing(self):
         return not self.nextFetchScheduler.empty()
 
-
-class MattermostAPI:
-    
-    def get_user_channels(self, user_id: str, *args: [str]) -> [str]:
-        """get the channel_ids for all the channels a user is a member of
-
-        Parameters
-        ----------
-        user_id : str
-            the user's id for whom we are fetching the channels
-
-        Returns
-        -------
-        [str]
-            the list of channel ids
-        """
-        user_teams = mm_api_GET("/users/" + user_id + "/teams")
-        all_channels = []
-
-        for team in user_teams:
-            channels_in_team = mm_api_GET(f"/users/{user_id}/teams/{team['id']}/channels")
-            all_channels.extend(channels_in_team)
-
-        all_channels = list({v['id']:v for v in all_channels}.values()) # make the channels list unique
-
-        print('Total no. of channels: ', len(all_channels))
-        
-        return [ch['id'] for ch in all_channels]
-
-    def get_details(self, entity: str, mm_id: str, args: [str]):
-        """ Fetchs the details of the entity (user, channel, post) from Mattermost's API
-
-        Parameters
-        ----------
-        entity : str
-            the entity we want to get the details of
-        mm_id : str
-            the id of the entity provided by Mattermost
-        args : [str]
-            the list of fields we want to get from the response
-
-        Returns
-        -------
-        {"field": "value"}
-            _description_
-        """
-        details = mm_api_GET(f"/{entity}/{mm_id}")
-
-        filtered_details = {}
-
-        for field in args:
-            filtered_details[str(field)] = details[str(field)]
-
-        return filtered_details
-
-    def get_user_details(self, user_id: str, *args: [str]):
-        user_data = self.get_details('users', user_id, args)
-        print('(*)'*40)
+    def reset_mattermost(self):
+        self.stop_sync()
         try:
-            real_name = f"{user_data['first_name']} {user_data['last_name']}".strip()
-            user_data.update({ 'name' : real_name or user_data['username'] })
-        except: pass
+            self.collection.delete(
+                where={"source" : "mm"}
+            )
 
-        return user_data
-
-    def get_channel_details(self, channel_id: str, *args: [str]):
-        print(self.get_details('channels', channel_id, args))
-        return self.get_details('channels', channel_id, args)
-    
-    def get_post_details(self, post_id: str, *args: [str]):
-        print(self.get_details('posts', post_id, args))
-        return self.get_details('posts', post_id, args)
-
-"""
-    # user_id -> realname 
-    # message_id -> time sent
-    # channel_id -> channel name
-
-Mattermost().get_user_details('ioff979djbn97juwtkx9cizq9e', 'first_name', 'last_name', 'username', 'email')             # Admin
-Mattermost().get_user_details('r3dhbuhw9f8gjpwyexd7ex4iuy', 'first_name', 'last_name', 'username', 'email', 'is_bot')   # Feedback-bot
-
-Mattermost().get_channel_details('9wgspwmu53y6mg1s6dpsbjzagy', 'name', 'display_name', 'type', 'team_id')   # hyperon           (public)
-Mattermost().get_channel_details('z4kqay9m1jdxipatytm7eyteur', 'name', 'display_name', 'type', 'team_id')   # icog-hyperon-team (private)
-
-Mattermost().get_post_details('u95bn1e1kiyg8d98hor7rwupwh', 'message', 'type', 'channel_id', 'user_id')     # Hello
-Mattermost().get_post_details('e68a8f4gsjya7g4isfujyej1fe', 'message', 'type', 'channel_id', 'user_id')     # Channel join
-
-print( Mattermost().get_user_channels('ioff979djbn97juwtkx9cizq9e', 'id', 'type', 'name') )
-
-Mattermost().get_all_channels('id', 'name', 'total_msg_count')
-"""
-
-# authenticate a user (through the MM API)
-def __get_auth_token():
-    if MM_PERSONAL_ACCESS_TOKEN:
-        return MM_PERSONAL_ACCESS_TOKEN
-    else:
-        print('Warning: You\'re not using a Personal-Access-Token, your session might expire!')
-        return requests.post(
-            MM_API_URL + "/users/login",
-            json={ "login_id": MM_USER_NAME,
-                    "password": MM_PASSWORD },
-            headers={ "Content-type": "application/json; charset=UTF-8" },
-        ).headers["token"]
-
-def mm_api_GET(route: str, params={}):
-    authHeader = "Bearer " + __get_auth_token()
-
-    res = requests.get(
-        MM_API_URL + route,
-        params=params,
-        headers={
-            "Content-type": "application/json; charset=UTF-8",
-            "Authorization": authHeader,
-        },
-    )
-    
-    # Guard against bad requests
-    if res.status_code != requests.codes.ok:
-        raise Exception(f"Request to '{route}' failed with status code: ", res.status_code)
-        
-    return res.json()
+            # Delete fetch time shelve store
+            with shelve.open(FETCH_TIME_SHELVE_NAME) as fetch_time_shelve:
+                del fetch_time_shelve[FETCH_TIME_SHELVE_NAME]    # Delete the field within the shelve store
+                print('Fetch time shelve deleted!')
+        except:
+            print(f'No collection named { CHROMA_COLLECTION } detected!')
