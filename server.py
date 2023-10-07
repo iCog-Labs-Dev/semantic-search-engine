@@ -1,3 +1,5 @@
+import sys
+sys.path.append('./src')
 from flask import Flask, request, Response
 from flask_cors import CORS
 import threading
