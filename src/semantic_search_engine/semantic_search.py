@@ -90,6 +90,8 @@ class SemanticSearch():
         
         # Get the channels list for the user from Mattermost's API
         channels_list = MMApi().get_user_channels(user_id=user_id)
+        #TODO: (Optional) Call a function to get a list of Slack channels as well
+        # and append it to the channel_list
         
         query_result = self.collection.query(
             query_texts=[query],
