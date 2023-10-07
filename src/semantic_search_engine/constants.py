@@ -1,6 +1,5 @@
 import os
 from dotenv import load_dotenv
-import shelve
 
 load_dotenv()
 
@@ -13,7 +12,7 @@ CHROMA_HOST = os.environ.get("SS_CHROMA_DB_HOST") or "127.0.0.1"
 CHROMA_PORT = os.environ.get("SS_CHROMA_DB_PORT") or 5555
 
 # Slack Sqlite
-SQLITE_PATH = os.path.join(DIR, 'db')
+SQLITE_PATH = os.path.join(DIR, 'sqlite')
 TEMP_SLACK_DATA_PATH = os.path.join(SQLITE_PATH, 'temp/')
 
 # LLM       # TODO: We should use our own instance of a hosted LLM
@@ -38,14 +37,3 @@ FETCH_INTERVAL_SHELVE = os.path.join(SHELVE_PATH, "fetch_interval")
 MM_PAT_SHELVE = os.path.join(SHELVE_PATH, "personal_access_token")
 MM_API_URL_SHELVE = os.path.join(SHELVE_PATH, "mattermost_api_url")
 CHROMA_N_RESULTS_SHELVE = os.path.join(SHELVE_PATH, "chroma_n_results")
-# SETTINGS_SHELVE = os.path.join(SHELVE_PATH, "settings")
-
-# # Constants from shelve
-# with shelve.open(SETTINGS_SHELVE_NAME) as settings:
-#     MM_API_URL = settings['mattermost_api_url']
-
-#     CHROMA_N_RESULTS = settings['chroma_n_results']
-
-#     # TODO: This should be kept more securely
-#     MM_PERSONAL_ACCESS_TOKEN = settings['personal_access_token']
-
