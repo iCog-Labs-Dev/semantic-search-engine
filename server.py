@@ -9,6 +9,7 @@ from semantic_search_engine.semantic_search import SemanticSearch
 from semantic_search_engine.mattermost.mattermost import Mattermost
 from semantic_search_engine.mattermost.mm_api import MattermostAPI as MM_Api
 from semantic_search_engine.slack.slack import Slack
+from semantic_search_engine.slack.models import User, Channel, ChannelMember, Message
 from semantic_search_engine.constants import FETCH_INTERVAL_SHELVE, SHELVE_FIELD, LAST_FETCH_TIME_SHELVE, MM_PAT_SHELVE, MM_API_URL_SHELVE, CHROMA_N_RESULTS_SHELVE, TEMP_SLACK_DATA_PATH
 
 
@@ -37,16 +38,15 @@ def root_route():
 
 # =========== Test Chroma ===========
 # TODO: remove this endpoint
-@app.route('/chroma/<action>', methods=['POST'])
-def chroma_route(action):
-    query = request.json['query']
-    n_results = request.json['n_results']
-    source = request.json['source']
-    user_id = request.json['user_id']
+@app.route('/query_db/<db>', methods=['POST'])
+def chroma_route(db):
+    if db == 'chroma':
+        query = request.json['query']
+        n_results = request.json['n_results']
+        source = request.json['source']
+        user_id = request.json['user_id']
+        channels_list = MM_Api().get_user_channels(user_id=user_id) if source == 'mm' else ['']
 
-    channels_list = MM_Api().get_user_channels(user_id=user_id) if source == 'mm' else ['']
-
-    if action == 'query':
         res = semantic_client.collection.query(
                 query_texts=[query],
                 n_results=n_results,
@@ -71,10 +71,17 @@ def chroma_route(action):
                     ]
                 }
             )
+        
         res['channel_list'] = channels_list
-    
         return res
+    
+    elif db == 'sqlite':
+        rows = Message.select()
+        res = []
+        for row in rows:
+            res.append(row.time)
 
+        return res
 
 # ************************************************************** /search
 
@@ -133,30 +140,49 @@ def stop_sync():
         }
 
 # ************************************************************** /upload-slack-zip
-@app.route('/upload-slack-zip', methods= ['POST'])
+@app.route('/upload-slack-zip', methods= ['GET', 'POST'])
 def save_slack_zip():
-    
-    file_path = os.path.join(TEMP_SLACK_DATA_PATH, 'slack-export-data.zip')
+    if request.method == 'GET':
+        return '''<pre><h4> Send a POST request: <br>
+        MultipartFormData    
+            file = (Zip file containing slack export data)
+    </h4></pre>'''
 
-    if "file" not in request.files:
-        return Response("{ 'error' : 'File Not Sent' }", status=500, mimetype='application/json')
-    
-    file = request.files["file"]
+    elif request.method == 'POST':
+        if "file" not in request.files:
+            return Response("{ 'error' : 'File Not Sent' }", status=500, mimetype='application/json')
+        file = request.files["file"]
+        file_path = os.path.join(TEMP_SLACK_DATA_PATH, 'slack-export-data.zip')
 
-    file.save(file_path)            # Save the zip file
-    slack.extract_zip(file_path)    # Extract it
-    os.remove(file_path)            # Delete the zip file
+        file.save(file_path)            # Save the zip file
+        channel_details = slack.upload_slack_data_zip(file_path)    # Extract it and read the channel details
+        os.remove(file_path)            # Delete the zip file
 
-    # TODO: should return list of channels
-    return Response("{ 'message' : 'Successfully Extracted!' }", status=500, mimetype='application/json')
+    # return Response(channel_details, status=500, mimetype='application/json')
+    return channel_details
 
-# ************************************************************** /import-slack-data
+# ************************************************************** /store-slack-data
 
-@app.route('/import-slack-data', methods= ['POST'])
-def import_data():
-    slack.import_slack_data()
+@app.route('/store-slack-data', methods= ['GET', 'POST'])
+def store_data():
+    if request.method == 'GET':
+        return '''<pre><h4> Send a POST request: <br>
+    {   
+        "channel_id" : {
+            "store_all" : true | false,
+            "store_none" : true | false,
+            "start_date" : (start date in POSIX time),
+            "end_date" : (end date in POSIX time)
+        },
+        ...
+    } </h4></pre>'''
 
-    return 'Imported!'
+    elif request.method == 'POST':
+        channel_specs = request.get_json()
+        slack.store_slack_data(channel_specs=channel_specs)
+
+        #TODO: should return progress in real-time (channel by channel)
+        return Response("{ 'message' : 'Slack data stored!' }", status=200, mimetype='application/json')
 
 # ************************************************************** /reset
 
@@ -178,7 +204,7 @@ def reset_all():
         if body.get("slack", False):
             slack.reset_slack()
     
-    return 'Reset Successful!'
+    return Response("{ 'message' : 'Reset Successful!' }", status=200, mimetype='application/json')
 
 # ************************************************************** /set_personal_access_token
 
