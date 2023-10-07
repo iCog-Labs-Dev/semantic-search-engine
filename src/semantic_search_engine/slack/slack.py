@@ -1,52 +1,99 @@
-from peewee import *
+import os, json
 from zipfile import ZipFile
-from semantic_search_engine.slack.save import *
-from semantic_search_engine.slack.models import *
+from semantic_search_engine.slack.save import save_channel_messages, save_channels_data, save_users_data
+from semantic_search_engine.slack.models import User, Channel, ChannelMember, Message
 from semantic_search_engine.constants import TEMP_SLACK_DATA_PATH
 
 class Slack:
 
-    def __init__(self, collection):
+    def __init__(self, collection) -> None:
         self.collection = collection
 
-
-    def extract_zip(self, file : str) -> None:
-        """extract from a zip file this will be used to easily upload export 
-        data and be able to process it
-
-        Parameters
-        ----------
-        file : any
-            the zip file to open
-        """
-        with ZipFile(file, 'r') as zObject:
-            zObject.extractall(path=TEMP_SLACK_DATA_PATH)
-
-    def reset_slack(self):
+    def reset_slack(self) -> None:
         """ deletes all slack data from SQLite and Chroma
         """
         # Delete all data from SQL database
         Message.delete().execute()
-        Channel.delete().execute()
         User.delete().execute()
+        Channel.delete().execute()
+        ChannelMember.delete().execute()
 
         # Delete all Chroma entries for Slack
         self.collection.delete(
             where={"source" : "sl"}
         )
 
-    def import_slack_data(self):
-        """ loads the extracted file from directory and saves everything to Sqlite and Chroma
+    def upload_slack_data_zip(self, file_path: str) -> [dict]:
+        """extract slack data from zip and store users and channels data
+            then return the list of channel details for all channels
+        Parameters
+        ----------
+        file_path : str
+            the location of the zip file to extract
+        Returns
+        ----------
+        [dict]
+            a list of dict with the details for each channel
         """
-        try:
-            save_users_data()
-            save_channels_data()
-        except: print('Users and channels are already exported!')
-            
-        rows=Channel.select()
-        for row in rows:
-            # print ("name: {} id: {}".format(row.name, row.channel_id))
-            save_channel_messages(channel_id=row.channel_id, collection=self.collection)
+        # Extract the zip file and store it in TEMP_SLACK_DATA_PATH
+        with ZipFile(file_path, 'r') as zObject:
+            zObject.extractall( path=TEMP_SLACK_DATA_PATH )
+        
+        # Get channels data from files and return them in a list
+        file_names = ['channels.json', 'groups.json']   # Files that store public and private channels' data
+        channel_details = []
+
+        for file_name in file_names:
+            public = file_name == 'channels.json'
+            try:
+                with open(file=os.path.join(TEMP_SLACK_DATA_PATH, file_name)) as json_file:
+                    channels_json = json.load(json_file)
+            except FileNotFoundError:
+                print(f'"{ file_name }" doesn\'t exist in "{ TEMP_SLACK_DATA_PATH }"')
+                continue
+
+            for channel in channels_json:
+                channel_details.append({
+                    'id': channel['id'],
+                    'name': channel['name'],
+                    'date_created': channel['created'],
+                    'no_members': len( channel['members'] ),
+                    'access': 'pub' if public else 'pri',
+                    'purpose': channel['purpose']['value']
+                })
+        return channel_details
+
+    def store_slack_data(self, channel_specs: dict) -> None:
+        """ loads the extracted file from directory and saves everything to Sqlite and Chroma
+         Parameters
+        ----------
+        channel_specs : dict
+            a dict containing the channel_ids along with the start and end dates
+            it also contains store_all and store_none boolean values
+        """
+        # Get users data from the extracted file path and save to db
+        # TODO: Should update previously stored Users
+        save_users_data()
+
+        # Get all channel_ids other than the ones where 'store_none'=True
+        channel_ids = [ch_id for ch_id, spec in channel_specs.items() if not spec["store_none"]]
+
+        # Get channels data from the extracted file path and save to db
+        # TODO: Should update previously stored Channels
+        saved_channels = save_channels_data(
+            channel_ids=channel_ids
+        )
+        
+        # Get messages for each channel from the extracted file path and save to db
+        # TODO: Should update previously stored Messages
+        save_channel_messages(
+            collection=self.collection,
+            saved_channels=saved_channels,
+            channel_specs=channel_specs
+        )
+
+        # TODO: respond with channel progress in real time
+            # yield ...    
     
     @staticmethod
     def get_channel_details(channel_id: str):
@@ -59,3 +106,8 @@ class Slack:
     @staticmethod
     def get_message_details(message_id: str):
         return Message.select().where( Message.message_id==message_id ).dicts().get()
+    
+    #TODO: (Optional) Implement a function that takes a Mattermost user_id / email and
+    # returns a list of slack 'private' channels in which the user is a member of
+    # def get_user_channels(user_id / email)
+    # This can be done after the OAUTH feature is complete
