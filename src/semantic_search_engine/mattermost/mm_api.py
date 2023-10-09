@@ -1,5 +1,5 @@
 
-from semantic_search_engine.constants import MM_USER_NAME, MM_PASSWORD, MM_PAT_SHELVE, SHELVE_FIELD, MM_API_URL_SHELVE
+from semantic_search_engine.constants import MM_USER_NAME, MM_PASSWORD, MM_PAT_SHELVE, MM_API_URL_SHELVE
 import requests
 import shelve
 
@@ -7,8 +7,8 @@ class MattermostAPI:
 
     def __init__(self):
         with shelve.open( MM_API_URL_SHELVE ) as mm_api_url_db:
-            # if mm_api_url_db.get( SHELVE_FIELD, False ):
-            self.mm_api_url = mm_api_url_db[SHELVE_FIELD]
+            # if mm_api_url_db.get( MM_API_URL_SHELVE, False ):
+            self.mm_api_url = mm_api_url_db[MM_API_URL_SHELVE]
     
     def get_user_channels(self, user_id: str, *args: [str]) -> [str]:
         """get the channel_ids for all the channels a user is a member of
@@ -88,8 +88,8 @@ class MattermostAPI:
     # authenticate a user (through the MM API)
     def __get_auth_token(self):
         with shelve.open( MM_PAT_SHELVE ) as mm_personal_access_token:
-            if mm_personal_access_token.get( SHELVE_FIELD, False ):
-                return mm_personal_access_token[SHELVE_FIELD]
+            if mm_personal_access_token.get( MM_PAT_SHELVE, False ):
+                return mm_personal_access_token[MM_PAT_SHELVE]
             else:
                 print('Warning: You\'re not using a Personal Access Token, your session might expire!')
                 return requests.post(

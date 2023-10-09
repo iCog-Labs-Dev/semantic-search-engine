@@ -1,3 +1,5 @@
+import sys
+sys.path.append('./src')
 from flask import Flask, request, Response
 from flask_cors import CORS
 import threading
@@ -7,7 +9,8 @@ from semantic_search_engine.semantic_search import SemanticSearch
 from semantic_search_engine.mattermost.mattermost import Mattermost
 from semantic_search_engine.mattermost.mm_api import MattermostAPI as MM_Api
 from semantic_search_engine.slack.slack import Slack
-from semantic_search_engine.constants import FETCH_INTERVAL_SHELVE, SHELVE_FIELD, LAST_FETCH_TIME_SHELVE, MM_PAT_SHELVE, MM_API_URL_SHELVE, CHROMA_N_RESULTS_SHELVE, TEMP_SLACK_DATA_PATH
+from semantic_search_engine.slack.models import User, Channel, ChannelMember, Message
+from semantic_search_engine.constants import FETCH_INTERVAL_SHELVE, LAST_FETCH_TIME_SHELVE, MM_PAT_SHELVE, MM_API_URL_SHELVE, CHROMA_N_RESULTS_SHELVE, TEMP_SLACK_DATA_PATH
 
 
 app = Flask(__name__)
@@ -24,10 +27,10 @@ def root_route():
     # return '''<h1>Hi ✋</h1>'''
     res = {}
     with shelve.open(FETCH_INTERVAL_SHELVE) as fetch_interval_db:
-        res['fetch_interval'] = fetch_interval_db[SHELVE_FIELD]
+        res['fetch_interval'] = fetch_interval_db[FETCH_INTERVAL_SHELVE]
 
     with shelve.open(LAST_FETCH_TIME_SHELVE) as last_fetch_time_db:
-        res['last_fetch_time'] = last_fetch_time_db[SHELVE_FIELD] * 1000
+        res['last_fetch_time'] = last_fetch_time_db[LAST_FETCH_TIME_SHELVE] * 1000
         
     res['is_syncing'] = mattermost.is_syncing()
 
@@ -35,16 +38,15 @@ def root_route():
 
 # =========== Test Chroma ===========
 # TODO: remove this endpoint
-@app.route('/chroma/<action>', methods=['POST'])
-def chroma_route(action):
-    query = request.json['query']
-    n_results = request.json['n_results']
-    source = request.json['source']
-    user_id = request.json['user_id']
+@app.route('/query_db/<db>', methods=['POST'])
+def chroma_route(db):
+    if db == 'chroma':
+        query = request.json['query']
+        n_results = request.json['n_results']
+        source = request.json['source']
+        user_id = request.json['user_id']
+        channels_list = MM_Api().get_user_channels(user_id=user_id) if source == 'mm' else ['']
 
-    channels_list = MM_Api().get_user_channels(user_id=user_id) if source == 'mm' else ['']
-
-    if action == 'query':
         res = semantic_client.collection.query(
                 query_texts=[query],
                 n_results=n_results,
@@ -69,10 +71,19 @@ def chroma_route(action):
                     ]
                 }
             )
+        
         res['channel_list'] = channels_list
-    
         return res
-
+    
+    elif db == 'sqlite':
+        table = request.json['table']
+        if table == 'User': rows = User.select().dicts()
+        elif table == 'Message': rows = Message.select().dicts()
+        elif table == 'Channel': rows = Channel.select().dicts()
+        elif table == 'ChannelMember': rows = ChannelMember.select().dicts()
+        else: return 'Enter a valid table name'
+        res = [row for row in rows]
+        return res
 
 # ************************************************************** /search
 
@@ -92,9 +103,9 @@ def semantic_search():
 
         return semantic_client.semantic_search(query=query, user_id=user_id)
     
-# ************************************************************** /start-sync
+# ************************************************************** /start_sync
     
-@app.route('/start-sync', methods=['GET', 'POST'])
+@app.route('/start_sync', methods=['GET', 'POST'])
 def start_sync():
     if request.method == 'GET':
         return '''<pre><h4> Send a POST request: <br>
@@ -108,7 +119,7 @@ def start_sync():
         # Update the API URL in shelve
         if body.get("mm_api_url", False):
             with shelve.open( MM_API_URL_SHELVE ) as mm_api_url_db:
-                mm_api_url_db[SHELVE_FIELD] = body['mm_api_url']
+                mm_api_url_db[MM_API_URL_SHELVE] = body['mm_api_url']
         else:
             return 'Mattermost API URL not set!'
         
@@ -121,40 +132,59 @@ def start_sync():
             "is_syncing": mattermost.is_syncing()
         }
 
-# ************************************************************** /stop-sync
+# ************************************************************** /stop_sync
  
-@app.route('/stop-sync', methods=['GET'])
+@app.route('/stop_sync', methods=['GET'])
 def stop_sync():
     mattermost.stop_sync()
     return {
             "is_syncing": mattermost.is_syncing()
         }
 
-# ************************************************************** /upload-slack-zip
-@app.route('/upload-slack-zip', methods= ['POST'])
+# ************************************************************** /upload_slack_zip
+@app.route('/upload_slack_zip', methods= ['GET', 'POST'])
 def save_slack_zip():
-    
-    file_path = os.path.join(TEMP_SLACK_DATA_PATH, 'slack-export-data.zip')
+    if request.method == 'GET':
+        return '''<pre><h4> Send a POST request: <br>
+        MultipartFormData    
+            file = (Zip file containing slack export data)
+    </h4></pre>'''
 
-    if "file" not in request.files:
-        return Response("{ 'error' : 'File Not Sent' }", status=500, mimetype='application/json')
-    
-    file = request.files["file"]
+    elif request.method == 'POST':
+        if "file" not in request.files:
+            return Response("{ 'error' : 'File Not Sent' }", status=500, mimetype='application/json')
+        file = request.files["file"]
+        file_path = os.path.join(TEMP_SLACK_DATA_PATH, 'slack-export-data.zip')
 
-    file.save(file_path)            # Save the zip file
-    slack.extract_zip(file_path)    # Extract it
-    os.remove(file_path)            # Delete the zip file
+        file.save(file_path)            # Save the zip file
+        channel_details = slack.upload_slack_data_zip(file_path)    # Extract it and read the channel details
+        os.remove(file_path)            # Delete the zip file
 
-    # TODO: should return list of channels
-    return Response("{ 'message' : 'Successfully Extracted!' }", status=500, mimetype='application/json')
+    # return Response(channel_details, status=500, mimetype='application/json')
+    return channel_details
 
-# ************************************************************** /import-slack-data
+# ************************************************************** /store_slack_data
 
-@app.route('/import-slack-data', methods= ['POST'])
-def import_data():
-    slack.import_slack_data()
+@app.route('/store_slack_data', methods= ['GET', 'POST'])
+def store_data():
+    if request.method == 'GET':
+        return '''<pre><h4> Send a POST request: <br>
+    {   
+        "channel_id" : {
+            "store_all" : true | false,
+            "store_none" : true | false,
+            "start_date" : (start date in POSIX time),
+            "end_date" : (end date in POSIX time)
+        },
+        ...
+    } </h4></pre>'''
 
-    return 'Imported!'
+    elif request.method == 'POST':
+        channel_specs = request.get_json()
+        slack.store_slack_data(channel_specs=channel_specs)
+
+        #TODO: should return progress in real-time (channel by channel)
+        return Response("{ 'message' : 'Slack data stored!' }", status=200, mimetype='application/json')
 
 # ************************************************************** /reset
 
@@ -176,7 +206,7 @@ def reset_all():
         if body.get("slack", False):
             slack.reset_slack()
     
-    return 'Reset Successful!'
+    return Response("{ 'message' : 'Reset Successful!' }", status=200, mimetype='application/json')
 
 # ************************************************************** /set_personal_access_token
 
@@ -193,7 +223,7 @@ def set_personal_access_token():
 
         if body.get("personal_access_token", False): 
             with shelve.open( MM_PAT_SHELVE ) as mm_pat_db:
-                mm_pat_db[SHELVE_FIELD] = body['personal_access_token']
+                mm_pat_db[MM_PAT_SHELVE] = body['personal_access_token']
                 return dict(mm_pat_db)
         else:
             return 'Please provide a personal access token!'
@@ -214,8 +244,8 @@ def set_fetch_interval():
 
         if body.get("fetch_interval", False): 
             with shelve.open( FETCH_INTERVAL_SHELVE ) as fetch_interval_db:
-                fetch_interval_db[SHELVE_FIELD] = int( body['fetch_interval'] )
-                mattermost.update_fetch_interval(fetch_interval_db[SHELVE_FIELD])
+                fetch_interval_db[FETCH_INTERVAL_SHELVE] = int( body['fetch_interval'] )
+                mattermost.update_fetch_interval(fetch_interval_db[FETCH_INTERVAL_SHELVE])
                 return dict(fetch_interval_db)
         else:
             return 'Please provide a fetch interval!'
@@ -235,7 +265,7 @@ def set_chroma_n_results():
 
         if body.get("chroma_n_results", False): 
             with shelve.open( CHROMA_N_RESULTS_SHELVE ) as chroma_n_results_db:
-                chroma_n_results_db[SHELVE_FIELD] = int( body['chroma_n_results'] )
+                chroma_n_results_db[CHROMA_N_RESULTS_SHELVE] = int( body['chroma_n_results'] )
                 return dict(chroma_n_results_db)
         else:
             return 'Please provide the number of messages / results to be used as context!'

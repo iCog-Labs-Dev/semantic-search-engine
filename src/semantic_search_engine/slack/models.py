@@ -1,12 +1,5 @@
-from peewee import *
-import os
-
-# TODO: get this out of here
-# get or create connection with SQLite database
-db = SqliteDatabase(
-   os.getcwd() + '/src/database/test.db', pragmas={'journal_mode': 'wal', 'cache_size': 10000,'foreign_keys': 1}
-)
-print('Path to local db:', db.database)
+from peewee import Model, CharField, TextField, IntegerField, ForeignKeyField, DateTimeField
+from . import db
 
 # Create a schema for 'User'
 class User (Model):
@@ -29,7 +22,15 @@ class Channel (Model):
    class Meta:
       database=db
       db_table='Channels'
-    
+
+# Create a schema for 'ChannelMember'
+class ChannelMember (Model):
+   channel_id=CharField( column_name='channel_id' )
+   user_ids=TextField( column_name='user_ids' )
+   no_members=IntegerField( column_name='no_members' )
+   class Meta:
+      database=db
+      db_table='ChannelMembers'
 
 # Create a schema for 'Channel'
 class Message (Model):
