@@ -30,7 +30,7 @@ DEFAULT_CHROMA_N_RESULTS = 25
 
 # Shelve
 SHELVE_PATH = os.path.join(DIR, 'shelve')
-SHELVE_FIELD = 'value'
+# SHELVE_FIELD = 'value'
 
 LAST_FETCH_TIME_SHELVE = os.path.join(SHELVE_PATH, "last_fetch_time")
 FETCH_INTERVAL_SHELVE = os.path.join(SHELVE_PATH, "fetch_interval")

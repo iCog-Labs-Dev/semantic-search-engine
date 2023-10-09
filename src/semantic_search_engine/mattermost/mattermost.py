@@ -2,7 +2,7 @@ from time import time, sleep
 from sched import scheduler
 import shelve
 
-from semantic_search_engine.constants import DEFAULT_LAST_FETCH_TIME, FETCH_INTERVAL_SHELVE, LAST_FETCH_TIME_SHELVE, SHELVE_FIELD, MM_PAT_SHELVE
+from semantic_search_engine.constants import DEFAULT_LAST_FETCH_TIME, FETCH_INTERVAL_SHELVE, LAST_FETCH_TIME_SHELVE, MM_PAT_SHELVE
 from semantic_search_engine.mattermost.mm_api import MattermostAPI as MMApi
 from datetime import datetime
 
@@ -12,10 +12,10 @@ class Mattermost:
         self.collection = collection
 
         with shelve.open(FETCH_INTERVAL_SHELVE) as fetch_interval:
-            self.fetch_interval_in_seconds = int(fetch_interval[SHELVE_FIELD])
+            self.fetch_interval_in_seconds = int(fetch_interval[FETCH_INTERVAL_SHELVE])
 
         with shelve.open(LAST_FETCH_TIME_SHELVE) as last_fetch_time:
-            self.last_fetch_time = int(last_fetch_time[SHELVE_FIELD])
+            self.last_fetch_time = int(last_fetch_time[LAST_FETCH_TIME_SHELVE])
     
     nextFetchScheduler = scheduler(time, sleep)
     LAST_FETCH_TIME_SHELVE = LAST_FETCH_TIME_SHELVE
@@ -178,7 +178,7 @@ class Mattermost:
         # Update last_fetch_time in shelve store
         with shelve.open(LAST_FETCH_TIME_SHELVE) as db: # handles the closing of the shelve file automatically with context manager
             # Set the last fetch time to the current time for next api call
-            db[SHELVE_FIELD] = current_time
+            db[LAST_FETCH_TIME_SHELVE] = current_time
             
         # Update global last_fetch_time
         self.last_fetch_time = current_time
@@ -243,7 +243,7 @@ class Mattermost:
 
             # Reset last_fetch_time in shelve store
             with shelve.open(LAST_FETCH_TIME_SHELVE) as last_fetch_time:
-                last_fetch_time[SHELVE_FIELD] = DEFAULT_LAST_FETCH_TIME
+                last_fetch_time[LAST_FETCH_TIME_SHELVE] = DEFAULT_LAST_FETCH_TIME
                 print('Last fetch time reset!')
         except:
             print('No Chroma Collection!')

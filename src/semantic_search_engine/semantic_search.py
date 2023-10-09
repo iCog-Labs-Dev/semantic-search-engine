@@ -1,7 +1,7 @@
 from chromadb import EmbeddingFunction
 from semantic_search_engine.llm import TogetherLLM
 from semantic_search_engine.chroma import  get_chroma_collection
-from semantic_search_engine.constants import MM_API_URL_SHELVE, CHROMA_N_RESULTS_SHELVE, SHELVE_FIELD
+from semantic_search_engine.constants import MM_API_URL_SHELVE, CHROMA_N_RESULTS_SHELVE
 from langchain import LLMChain, PromptTemplate
 from chromadb.utils import embedding_functions
 from langchain.llms.base import LLM
@@ -86,7 +86,7 @@ class SemanticSearch():
         """
         # Get the number of results to be returned by Chroma from shelve
         with shelve.open(CHROMA_N_RESULTS_SHELVE) as chroma_n_results:
-            n_results = int(chroma_n_results[SHELVE_FIELD])
+            n_results = int(chroma_n_results[CHROMA_N_RESULTS_SHELVE])
         
         # Get the channels list for the user from Mattermost's API
         channels_list = MMApi().get_user_channels(user_id=user_id)
@@ -170,7 +170,7 @@ class SemanticSearch():
 
                 # Get the number of results to be returned by Chroma from shelve
                 with shelve.open(MM_API_URL_SHELVE) as mm_api_url:
-                    api_url = mm_api_url[SHELVE_FIELD]
+                    api_url = mm_api_url[MM_API_URL_SHELVE]
                 
                 # Look for "api" from the right and cut out the url after that...  "http://localhost:8065/api/v4"  -->  "http://localhost:8065/"
                 mm_url = api_url[: api_url.rfind("api") ]
