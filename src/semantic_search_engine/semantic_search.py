@@ -99,18 +99,7 @@ class SemanticSearch():
             # Get all messages from slack or specific channels that the user's a member of in MM
             where = 
                 {
-                    "$or": [
-                        {
-                            "access": {
-                                "$eq": "pub"
-                            }
-                        },
-                        {
-                            "channel_id": {
-                                "$in": channels_list
-                            }
-                        }
-                    ]
+                    "channel_id": { "$in": channels_list }
                 }
         )
 
