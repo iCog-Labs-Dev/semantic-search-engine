@@ -73,24 +73,28 @@ class Slack:
         """
         # Get users data from the extracted file path and save to db
         # TODO: Should update previously stored Users
-        save_users_data()
+        try:
+            save_users_data()
+        except: print('User data already exists!')
 
         # Get all channel_ids other than the ones where 'store_none'=True
         channel_ids = [ch_id for ch_id, spec in channel_specs.items() if not spec["store_none"]]
 
         # Get channels data from the extracted file path and save to db
         # TODO: Should update previously stored Channels
-        saved_channels = save_channels_data(
-            channel_ids=channel_ids
-        )
+        try:
+            saved_channels = save_channels_data(
+                channel_ids=channel_ids
+            )
         
-        # Get messages for each channel from the extracted file path and save to db
-        # TODO: Should update previously stored Messages
-        save_channel_messages(
-            collection=self.collection,
-            saved_channels=saved_channels,
-            channel_specs=channel_specs
-        )
+            # Get messages for each channel from the extracted file path and save to db
+            # TODO: Should update previously stored Messages
+            save_channel_messages(
+                collection=self.collection,
+                saved_channels=saved_channels,
+                channel_specs=channel_specs
+            )
+        except: print('Channel and Message data already exists!')
 
         # TODO: respond with channel progress in real time
             # yield ...    
