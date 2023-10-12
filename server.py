@@ -1,10 +1,15 @@
 import sys
 sys.path.append('./src')
-from flask import Flask, request, Response
+from flask import Flask, request, Response, redirect, url_for, session
 from flask_cors import CORS
+from datetime import timedelta
 import threading
 import os
 import shelve
+
+from authlib.integrations.flask_client import OAuth
+from mm_oauth import register_oauth_client, login_required
+
 from semantic_search_engine.semantic_search import SemanticSearch
 from semantic_search_engine.mattermost.mattermost import Mattermost
 from semantic_search_engine.mattermost.mm_api import MattermostAPI as MM_Api
@@ -12,10 +17,20 @@ from semantic_search_engine.slack.slack import Slack
 from semantic_search_engine.slack.models import User, Channel, ChannelMember, Message
 from semantic_search_engine.constants import FETCH_INTERVAL_SHELVE, LAST_FETCH_TIME_SHELVE, MM_PAT_SHELVE, MM_API_URL_SHELVE, CHROMA_N_RESULTS_SHELVE, TEMP_SLACK_DATA_PATH
 
+from dotenv import load_dotenv
+load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+CORS(app)   # , resources={r"/*": {"origins": "http://localhost:3000"}})
+oauth = OAuth(app)
+mm_client = register_oauth_client(oauth=oauth)
 
+# Session config
+app.secret_key = os.getenv("APP_SECRET_KEY") or 'some_key_for_session_encryption'
+app.config['SESSION_COOKIE_NAME'] = 'mattermost-login-session'
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=720)   # 720 - The session lasts for 12 Hours
+
+# semantic_search_engine initializations
 semantic_client = SemanticSearch()
 collection = semantic_client.collection
 mattermost = Mattermost(collection)
@@ -36,6 +51,53 @@ def root_route():
 
     return res
 
+
+# ******************************************************** OAUTH *************************************************************
+# **************************************************************************************************************************** /
+
+@app.route('/login')
+def login():
+    google = oauth.create_client('mattermost')  # create the google oauth client
+    redirect_uri = url_for('authorize', _external=True)
+    return google.authorize_redirect(redirect_uri)
+
+@app.route('/authorize')
+def authorize():
+    print('Authorized')
+    token = oauth.google.authorize_access_token()   # Get access token from Mattermost oauth
+    user_info = oauth.google.userinfo()  # uses openId endpoint to fetch user info
+    print('TOKEN: ', token)
+    print('USER_INFO', user_info)
+    # resp.raise_for_status()
+    # print(resp.text)
+    print(user_info)
+
+    # Here you use the profile/user data that you got and query your database find/register the user and set ur own data in the session not the profile from google
+    session['profile'] = {
+        "user_id" : user_info['id'],
+        "name" : f"{ user_info['first_name'] } { user_info['last_name'] }".strip(),
+        "username" : user_info['username'],
+        "email" : user_info['email'],
+        "role" : user_info['roles'],
+        "access_token": token['access_token'],
+        "expires_at": token['expires_at'],
+    }
+    session.permanent = True  # make the session permanant so it keeps existing after browser gets closed
+    return ''#redirect('/')
+
+@app.route('/logout')
+def logout():
+    for key in list(session.keys()):
+        session.pop(key)    # Remove the session
+    return ''#redirect('/')
+
+@app.route('/test_oauth')
+@login_required
+def hello_world():
+    return dict(session)['profile']['email']
+
+# **************************************************************************************************************************** /
+
 # =========== Test Chroma ===========
 # TODO: remove this endpoint
 @app.route('/query_db/<db>', methods=['POST'])
@@ -47,7 +109,7 @@ def chroma_route(db):
         user_id = request.json['user_id']
         channels_list = MM_Api().get_user_channels(user_id=user_id) if source == 'mm' else ['']
 
-        res = semantic_client.collection.query(
+        res = collection.query(
                 query_texts=[query],
                 n_results=n_results,
                 where = {
