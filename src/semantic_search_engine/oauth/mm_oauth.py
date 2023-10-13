@@ -1,22 +1,15 @@
-import os
+import os, datetime
 from flask import session
 from functools import wraps
-from peewee import SqliteDatabase
 from semantic_search_engine.constants import TEMP_SLACK_DATA_PATH, SQLITE_PATH
 from dotenv import load_dotenv
+from . import db, Auth
 
 load_dotenv()
 
-os.makedirs(SQLITE_PATH, exist_ok=True)
-
-# get or create connection with SQLite database
-db = SqliteDatabase(
-   SQLITE_PATH + '/auth.db' #, pragmas={'journal_mode': 'wal', 'cache_size': 10000,'foreign_keys': 1}
-)
-
 # App config
-oauth_params = {'client_id': '3pcn3aajptb3uganhkymhoxpio',
-                'client_secret': 'hmo9noxwh3najnjpj9q77mro1a'}
+oauth_params = {'client_id': os.environ.get("OAUTH_CLIENT_ID"),
+                'client_secret': os.environ.get("OAUTH_CLIENT_SECRET")}
 
 def register_oauth_client(oauth):
     mm_client = oauth.register(
@@ -43,3 +36,26 @@ def login_required(f):
             return f(loggedin_user, *args, **kwargs)
         return 'You aint logged in, no page for u!'
     return decorated_function
+
+def get_loggedin_user(client_token: str): # -> bool:
+    try:
+        return Auth.select().where( Auth.client_token==client_token ).dicts().get()
+    except:
+        return {}
+
+def login_user(client_token: str, user_profile: dict) -> str:
+    return Auth.insert(
+        client_token=client_token,
+        user_id=user_profile['user_id'],
+        name=user_profile['name'],
+        username=user_profile['username'],
+        email=user_profile['email'],
+        role=user_profile['role'],
+        access_token=user_profile['access_token'],
+        expires_at=datetime.datetime.utcfromtimestamp( float(user_profile['expires_at']) * 1000 )
+    ).on_conflict_replace().execute()
+
+def logout_user(client_token: str): # -> str:
+    return Auth.delete().where(
+        Auth.client_token == client_token
+    ).execute()
