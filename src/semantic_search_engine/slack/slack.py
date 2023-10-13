@@ -72,33 +72,26 @@ class Slack:
             it also contains store_all and store_none boolean values
         """
         # Get users data from the extracted file path and save to db
-        # TODO: Should update previously stored Users
-        try:
-            save_users_data()
-        except: print('User data already exists!')
+        save_users_data()
 
         # Get all channel_ids other than the ones where 'store_none'=True
         channel_ids = [ch_id for ch_id, spec in channel_specs.items() if not spec["store_none"]]
 
         # Get channels data from the extracted file path and save to db
-        # TODO: Should update previously stored Channels
-        try:
-            saved_channels = save_channels_data(
-                channel_ids=channel_ids
-            )
-        
-            # Get messages for each channel from the extracted file path and save to db
-            # TODO: Should update previously stored Messages
-            save_channel_messages(
-                collection=self.collection,
-                saved_channels=saved_channels,
-                channel_specs=channel_specs
-            )
-        except: print('Channel and Message data already exists!')
+        saved_channels = save_channels_data(
+            channel_ids=channel_ids
+        )
+
+        # Get messages for each channel from the extracted file path and save to db
+        save_channel_messages(
+            collection=self.collection,
+            saved_channels=saved_channels,
+            channel_specs=channel_specs
+        )
 
         # TODO: respond with channel progress in real time
             # yield ...    
-    
+
     @staticmethod
     def get_channel_details(channel_id: str):
         return Channel.select().where( Channel.channel_id==channel_id ).dicts().get()
@@ -110,7 +103,7 @@ class Slack:
     @staticmethod
     def get_message_details(message_id: str):
         return Message.select().where( Message.message_id==message_id ).dicts().get()
-    
+
     #TODO: (Optional) Implement a function that takes a Mattermost user_id / email and
     # returns a list of slack 'private' channels in which the user is a member of
     # def get_user_channels(user_id / email)
