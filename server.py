@@ -173,13 +173,15 @@ def semantic_search():
         # query = request.args.get('query')
         return '''<pre><h4> Send a POST request: <br>
     {
-        "query" : "What did someone say about something?",
-        "client_token" : "The client token of the User"
-    } </h4></pre>'''
+        "query" : "What did someone say about something?"
+    } </h4>
+
+    Headers: client_token = "The client token of the User"
+    </pre>'''
 
     elif request.method == 'POST':
         query = request.json['query']
-        client_token = request.json['client_token']
+        client_token = request.headers.get('client_token')
         loggedin_user = get_loggedin_user(client_token=client_token)
  
         if loggedin_user:
