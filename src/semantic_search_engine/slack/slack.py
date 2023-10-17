@@ -58,7 +58,7 @@ class Slack:
                     'name': channel['name'],
                     'date_created': channel['created'],
                     'no_members': len( channel['members'] ),
-                    'access': 'pub' if public else 'pri',
+                    'access': 'public' if public else 'private',
                     'purpose': channel['purpose']['value']
                 })
         return channel_details

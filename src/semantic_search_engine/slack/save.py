@@ -107,8 +107,8 @@ def save_channel_messages(collection, saved_channels: [dict], channel_specs: [di
             start_date = datetime.utcfromtimestamp(0).date()
             end_date = datetime.now().date()
         else:
-            start_date = datetime.utcfromtimestamp(float(spec['start_date']) / 1000).date()
-            end_date = datetime.utcfromtimestamp(float(spec['end_date']) / 1000).date()
+            start_date = datetime.utcfromtimestamp(float(spec['start_date'])).date()
+            end_date = datetime.utcfromtimestamp(float(spec['end_date'])).date()
             if start_date >= end_date: 
                 print('Start date cannot be larger that end date!')
                 continue
