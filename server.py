@@ -1,22 +1,19 @@
 import sys
 sys.path.append('./src')
-from flask import Flask, jsonify, make_response, request, Response, url_for, session
-from flask_cors import CORS
-from flask_sse import sse
-from datetime import timedelta, datetime
-import threading
-import os
-import shelve
+import os, requests, threading, shelve
 
-from authlib.integrations.flask_client import OAuth
-from semantic_search_engine.oauth.mm_oauth import register_oauth_client, login_required, get_loggedin_user, login_user, logout_user
+from time import sleep
+from flask import Flask, jsonify, request, Response
+from flask_cors import CORS
+from functools import wraps
+# from flask_sse import sse
 
 from semantic_search_engine.semantic_search import SemanticSearch
 from semantic_search_engine.mattermost.mattermost import Mattermost
 from semantic_search_engine.mattermost.mm_api import MattermostAPI as MM_Api
 from semantic_search_engine.slack.slack import Slack
 from semantic_search_engine.slack.models import User, Channel, ChannelMember, Message
-from semantic_search_engine.constants import FETCH_INTERVAL_SHELVE, LAST_FETCH_TIME_SHELVE, MM_PAT_SHELVE, MM_API_URL_SHELVE, CHROMA_N_RESULTS_SHELVE, TEMP_SLACK_DATA_PATH
+from semantic_search_engine.constants import FETCH_INTERVAL_SHELVE, LAST_FETCH_TIME_SHELVE, MM_PAT_ID_SHELVE, CHROMA_N_RESULTS_SHELVE, TEMP_SLACK_DATA_PATH
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -25,55 +22,15 @@ app = Flask(__name__)
 # CORS(app)
 # CORS(app, resources={r"/*": {"origins": "http://localhost:8065"}}, supports_credentials=True)
 CORS(app=app,
-     origins=['http://localhost:8065', 'http://127.0.0.1:8065', 'http://localhost:8065/oauth/authorize'],
+     origins=['http://localhost:8065', 'http://127.0.0.1:8065'],
      supports_credentials=True)   # , resources={r"/*": {"origins": "http://localhost:3000"}})
-oauth = OAuth(app)
-mm_client = register_oauth_client(oauth=oauth)
+
+mm_api_url = os.getenv("MM_API_URL")
 
 # Session config
-# Set the secret key for session management
-app.secret_key = "sessionss"
-
-# Configure the session to match your Express session settings
+app.secret_key = os.getenv("APP_SECRET_KEY")  # Set the secret key for session management
 app.config['SESSION_COOKIE_SAMESITE'] = 'None'
 app.config['SESSION_COOKIE_SECURE'] = True
-
-# The /new route
-@app.route('/new', methods=['POST'])
-def new():
-    try:
-        token = request.json.get('token')
-        print(token)
-        session['ss_engine'] = token
-        return jsonify({"message": "saved"}), 201
-    except Exception as error:
-        print(error)
-        return str(error), 500
-
-# The /token route
-@app.route('/token', methods=['GET'])
-def get_token():
-    try:
-        print(dict(session))
-        token = session.get('ss_engine')
-        print(token)
-        return jsonify({"message": f'sse_{token}' })
-    except Exception as error:
-        print(error)
-        return str(error), 500
-
-# if __name__ == '__main__':
-#     app.run(port=3002)
-    
-
-    
-
-# app.secret_key = os.getenv("APP_SECRET_KEY") or 'some_key_for_session_encryption'
-# app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=720)   # 720 - The session lasts for 12 Hours
-# # app.config['SESSION_COOKIE_HTTPONLY'] = False
-# app.config['SESSION_COOKIE_NAME'] = 'MM_SS_AUTH'
-# app.config['SESSION_COOKIE_SAMESITE'] = 'None'
-# app.config['SESSION_COOKIE_SECURE'] = True
 
 # semantic_search_engine initializations
 semantic_client = SemanticSearch()
@@ -81,8 +38,48 @@ collection = semantic_client.collection
 mattermost = Mattermost(collection)
 slack = Slack(collection)
 # ************************************************************** /
+def admin_required(admin_only: bool):
+    def login_required(func):
+        @wraps(func)
+        def decorated_function(*args, **kwargs):
+            cookies = dict(request.cookies)
+            auth_token = cookies.get('MMAUTHTOKEN')
+            user_id = cookies.get('MMUSERID')
+            if not (auth_token and user_id):
+                return 'You must login and send requests with credentials enabled!', 500
+            
+            user_details = requests.get(
+                f'{mm_api_url}/users/me',
+                headers={ "Authorization": f"Bearer {cookies.get('MMAUTHTOKEN')}" },
+            )
+            if user_details.status_code != requests.codes.ok:
+                return 'Unauthorized! Your session might have expired.', 401
+            
+            user_email = user_details.json().get('email', '')
+            user_roles = user_details.json().get('roles', '').split(' ')
 
-@app.route('/root', methods=['GET'])
+            #Check if an invalid response is returned from the API
+            if not (user_email and user_roles):
+                return 'Invalid user data!', 401
+
+            #Check if the user has system_user role
+            if not admin_only and 'system_user' not in user_roles:
+                return 'Unauthorized! You should be a Mattermost user', 401
+            
+            # Check if the route requires admin privileges or not
+            if admin_only and 'system_admin' not in user_roles:     
+                return 'Unauthorized! You don\'t have Admin privileges!', 401
+            loggedin_user = {
+                'auth_token': auth_token,
+                'user_id': user_id,
+                'email': user_email
+            }
+            return func(loggedin_user, *args, **kwargs)
+        return decorated_function
+    return login_required
+
+@app.route('/', methods=['GET'])
+@admin_required(admin_only=True)
 def root_route():
     # return '''<h1>Hi ✋</h1>'''
     res = {}
@@ -91,74 +88,22 @@ def root_route():
 
     with shelve.open(LAST_FETCH_TIME_SHELVE) as last_fetch_time_db:
         res['last_fetch_time'] = last_fetch_time_db[LAST_FETCH_TIME_SHELVE] * 1000
+    
+    with shelve.open( CHROMA_N_RESULTS_SHELVE ) as chroma_n_results_db:
+        res['chroma_n_results'] =  chroma_n_results_db[CHROMA_N_RESULTS_SHELVE]
         
     res['is_syncing'] = mattermost.is_syncing()
-    
-    print(request.cookies)
-    cookies = dict(request.cookies)
-    print(cookies.get('MMAUTHTOKEN'))
-    print(cookies.get('MMUSERID'))
 
     return res
 
 
-# ******************************************************** OAUTH *************************************************************
-# **************************************************************************************************************************** /
-
-@app.route('/login', methods=['GET'])
-def login():
-    mm_client = oauth.create_client('mattermost')  # create the mm_client oauth client
-    redirect_uri = url_for('authorize', _external=True)
-
-    return mm_client.authorize_redirect(redirect_uri)
-
-@app.route('/oauth/callback')
-def authorize():
-    print('Authorized')
-    # client_token = session.get('client_token')  # Get the client_token from session
-    # if client_token is None:
-    #     return 'Authentication failed!'
-    try:
-        session['ss_engine'] = 'token from auth after login number 5'
-    except Exception as error:
-        print(error)
-
-    token = mm_client.authorize_access_token()   # Get access token from Mattermost oauth
-    user_info = mm_client.userinfo()  # uses openId endpoint to fetch user info
-    print('TOKEN: ', token)
-    # print('USER_INFO', user_info)
-
-    user_profile = {
-        "user_id" : user_info['id'],
-        "name" : f"{ user_info['first_name'] } { user_info['last_name'] }".strip(),
-        "username" : user_info['username'],
-        "email" : user_info['email'],
-        "role" : user_info['roles'],
-        "access_token": token['access_token'],
-        "expires_at": token['expires_in']
-    }
-
-    # Save logged in users data in sqlite
-    # login_user(client_token=client_token, user_profile=user_profile)
-    session['user_profile'] = user_profile 
-
-    # resp = make_response('Setting the cookie')  
-    # resp.set_cookie('GFG','ComputerScience Portal') 
-    return 'Authenticated!'
-
-@app.route('/logout', methods=['GET'])
-def logout():
-    client_token = request.headers.get('client_token')
-    logout_user(client_token=client_token)
-    
-    return 'logged out!'
+# ******************************************************** Get Current User ***************************************************
 
 @app.route('/current_user', methods=['GET'])
-def current_user():
-    user_profile = session.get('user_profile')
-    print(user_profile)
-    
-    return user_profile
+@admin_required(admin_only=False)
+def current_user(loggedin_user):
+    print(loggedin_user)
+    return loggedin_user
 
 # **************************************************************************************************************************** /
 
@@ -214,75 +159,57 @@ def chroma_route(db):
 # ************************************************************** /search
 
 @app.route('/search', methods=['GET', 'POST'])
-def semantic_search():
+@admin_required(admin_only=False)
+def semantic_search(loggedin_user):
     if request.method == 'GET':
-        # query = request.args.get('query')
         return '''<pre><h4> Send a POST request: <br>
     {
         "query" : "What did someone say about something?"
     } </h4>
-
-    Headers: client_token = "The client token of the User"
     </pre>'''
 
     elif request.method == 'POST':
         query = request.json['query']
-        print(request.headers)
-        client_token = request.headers.get('client_token')
-        loggedin_user = get_loggedin_user(client_token=client_token)
+        user_id = loggedin_user['user_id']
+        access_token = loggedin_user['auth_token']
 
-        print(loggedin_user)
- 
-        if loggedin_user:
-            user_id = loggedin_user.get('user_id', False)
-            access_token = loggedin_user.get('access_token', False)
-
-            return semantic_client.semantic_search(query=query, user_id=user_id)
-        else:
-            return 'Unauthorized!'   
+        return semantic_client.semantic_search(
+                    query=query,
+                    user_id=user_id,
+                    access_token=access_token
+            ) 
 
     
 # ************************************************************** /start_sync
     
-@app.route('/start_sync', methods=['GET', 'POST'])
-def start_sync():
-    if request.method == 'GET':
-        return '''<pre><h4> Send a POST request: <br>
-    {
-        "mm_api_url" : "the URL of the mattermost API",
-        "client_token" : "The client token of the Admin"
-    } </h4></pre>'''
+@app.route('/start_sync', methods=['GET'])
+@admin_required(admin_only=True)
+def start_sync(loggedin_user):
+    access_token = loggedin_user['auth_token']
+    try:
+        sync_thread = threading.Thread(target=mattermost.start_sync)
+        sync_thread.start(access_token=access_token)
+    except: return 'Something went wrong while attempting to sync!'
 
-    elif request.method == 'POST':
-        body = request.get_json()
-
-        # Update the API URL in shelve
-        if body.get("mm_api_url", False):
-            with shelve.open( MM_API_URL_SHELVE ) as mm_api_url_db:
-                mm_api_url_db[MM_API_URL_SHELVE] = body['mm_api_url']
-        else:
-            return 'Mattermost API URL not set!'
-        
-        try:
-            sync_thread = threading.Thread(target=mattermost.start_sync)
-            sync_thread.start()
-        except: return 'Something went wrong while attempting to sync!'
-
-        return {
-            "is_syncing": mattermost.is_syncing()
-        }
+    sleep(2)
+    return {
+        "is_syncing": mattermost.is_syncing()
+    }
 
 # ************************************************************** /stop_sync
  
 @app.route('/stop_sync', methods=['GET'])
+@admin_required(admin_only=True)
 def stop_sync():
     mattermost.stop_sync()
+    sleep(1)
     return {
-            "is_syncing": mattermost.is_syncing()
-        }
+        "is_syncing": mattermost.is_syncing()
+    }
 
 # ************************************************************** /upload_slack_zip
 @app.route('/upload_slack_zip', methods= ['GET', 'POST'])
+@admin_required(admin_only=True)
 def save_slack_zip():
     if request.method == 'GET':
         return '''<pre><h4> Send a POST request: <br>
@@ -306,6 +233,7 @@ def save_slack_zip():
 # ************************************************************** /store_slack_data
 
 @app.route('/store_slack_data', methods= ['GET', 'POST'])
+@admin_required(admin_only=True)
 def store_data():
     if request.method == 'GET':
         return '''<pre><h4> Send a POST request: <br>
@@ -329,6 +257,7 @@ def store_data():
 # ************************************************************** /reset
 
 @app.route('/reset', methods=['GET', 'POST'])
+@admin_required(admin_only=True)
 def reset_all():
     if request.method == 'GET':
         return '''<pre><h4> Send a POST request: <br>
@@ -350,28 +279,30 @@ def reset_all():
 
 # ************************************************************** /set_personal_access_token
 
-@app.route('/set_personal_access_token', methods=['GET', 'POST'])
-def set_personal_access_token():
-    if request.method == 'GET':
-        return '''<pre><h4> Send a POST request: <br>
-    {
-        "personal_access_token": "the pesonal access token of an admin user"
-    } </h4></pre>'''
+# @app.route('/set_personal_access_token', methods=['GET', 'POST'])
+# @admin_required(admin_only=True)
+# def set_personal_access_token():
+#     if request.method == 'GET':
+#         return '''<pre><h4> Send a POST request: <br>
+#     {
+#         "personal_access_token": "the pesonal access token of an admin user"
+#     } </h4></pre>'''
 
-    elif request.method == 'POST':
-        body = request.get_json()
+#     elif request.method == 'POST':
+#         body = request.get_json()
 
-        if body.get("personal_access_token", False): 
-            with shelve.open( MM_PAT_SHELVE ) as mm_pat_db:
-                mm_pat_db[MM_PAT_SHELVE] = body['personal_access_token']
-                return dict(mm_pat_db)
-        else:
-            return 'Please provide a personal access token!'
+#         if body.get("personal_access_token", False): 
+#             with shelve.open( MM_PAT_ID_SHELVE ) as mm_pat_db:
+#                 mm_pat_db[MM_PAT_ID_SHELVE] = body['personal_access_token']
+#                 return dict(mm_pat_db)
+#         else:
+#             return 'Please provide a personal access token!'
 
 
 # ************************************************************** /set_fetch_interval
 
 @app.route('/set_fetch_interval', methods=['GET', 'POST'])
+@admin_required(admin_only=True)
 def set_fetch_interval():
     if request.method == 'GET':
         return '''<pre><h4> Send a POST request: <br>
@@ -393,6 +324,7 @@ def set_fetch_interval():
 # ************************************************************** /set_chroma_n_results
 
 @app.route('/set_chroma_n_results', methods=['GET', 'POST'])
+@admin_required(admin_only=True)
 def set_chroma_n_results():
     if request.method == 'GET':
         return '''<pre><h4> Send a POST request: <br>
