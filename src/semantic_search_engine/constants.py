@@ -34,6 +34,5 @@ SHELVE_PATH = os.path.join(DIR, 'shelve')
 
 LAST_FETCH_TIME_SHELVE = os.path.join(SHELVE_PATH, "last_fetch_time")
 FETCH_INTERVAL_SHELVE = os.path.join(SHELVE_PATH, "fetch_interval")
-MM_PAT_SHELVE = os.path.join(SHELVE_PATH, "personal_access_token")
-MM_API_URL_SHELVE = os.path.join(SHELVE_PATH, "mattermost_api_url")
+MM_PAT_ID_SHELVE = os.path.join(SHELVE_PATH, "personal_access_token_id")
 CHROMA_N_RESULTS_SHELVE = os.path.join(SHELVE_PATH, "chroma_n_results")
