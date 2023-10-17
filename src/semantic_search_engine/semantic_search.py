@@ -1,14 +1,14 @@
 from chromadb import EmbeddingFunction
 from semantic_search_engine.llm import TogetherLLM
 from semantic_search_engine.chroma import  get_chroma_collection
-from semantic_search_engine.constants import MM_API_URL_SHELVE, CHROMA_N_RESULTS_SHELVE
+from semantic_search_engine.constants import CHROMA_N_RESULTS_SHELVE
 from langchain import LLMChain, PromptTemplate
 from chromadb.utils import embedding_functions
 from langchain.llms.base import LLM
 from datetime import datetime
 from semantic_search_engine.mattermost.mm_api import MattermostAPI as MMApi
 from semantic_search_engine.slack.slack import Slack as Sl
-import shelve
+import os, shelve
 
 class SemanticSearch():
     """The entrypoint to the package that contains the necessary data to 
@@ -67,7 +67,7 @@ class SemanticSearch():
         # Get or create a chroma collection
         self.collection = get_chroma_collection(self.embedding_function)
 
-    def semantic_search(self, query : str, user_id: str):
+    def semantic_search(self, query : str, user_id: str, access_token: str):
         """executes a semantic search on an LLM based on a certain query from a\
         vector db.
 
@@ -88,8 +88,13 @@ class SemanticSearch():
         with shelve.open(CHROMA_N_RESULTS_SHELVE) as chroma_n_results:
             n_results = int(chroma_n_results[CHROMA_N_RESULTS_SHELVE])
         
+        # Initialze MMApi with the user's access_token
+        mm_api = MMApi(access_token=access_token)
         # Get the channels list for the user from Mattermost's API
-        channels_list = MMApi().get_user_channels(user_id=user_id)
+        channels_list = mm_api.get_user_channels(user_id=user_id)
+
+
+
         #TODO: (Optional) Call a function to get a list of Slack channels as well
         # and append it to the channel_list
         
@@ -104,7 +109,7 @@ class SemanticSearch():
         )
 
         # Get the details for each user, channel and message returned from chroma
-        details = self.get_metadata_details(query_result["ids"][0], query_result["metadatas"][0], query_result["distances"][0])
+        details = self.get_metadata_details(mm_api, query_result["ids"][0], query_result["metadatas"][0], query_result["distances"][0])
 
         # Get the response from the LLM
         llm_response = self.chain.run(
@@ -121,7 +126,7 @@ class SemanticSearch():
 
 
     @staticmethod
-    def get_metadata_details(ids, metadatas, distances):
+    def get_metadata_details(mm_api, ids, metadatas, distances):
         response = []
 
         for idx, metadata in enumerate(metadatas):
@@ -139,28 +144,25 @@ class SemanticSearch():
                 "score":""
             }
             if metadata['source']=='mm':
-                user_data = MMApi().get_user_details(
+                user_data = mm_api.get_user_details(
                     metadata['user_id'],
                     'first_name', 'last_name', 'username'
                     )
-                channel_data = MMApi().get_channel_details(
+                channel_data = mm_api.get_channel_details(
                     metadata['channel_id'],
                     'name', 'display_name', 'team_id'
                     )
 
-                post_data = MMApi().get_post_details(
+                post_data = mm_api.get_post_details(
                     ids[idx],
                     'id', 'message', 'update_at' # create_at
                     )
-                team_data = MMApi().get_team_details(
+                team_data = mm_api.get_team_details(
                     channel_data['team_id'],
                     'name'
                 )
 
-                # Get the number of results to be returned by Chroma from shelve
-                with shelve.open(MM_API_URL_SHELVE) as mm_api_url:
-                    api_url = mm_api_url[MM_API_URL_SHELVE]
-                
+                api_url = os.getenv("MM_API_URL")
                 # Look for "api" from the right and cut out the url after that...  "http://localhost:8065/api/v4"  -->  "http://localhost:8065/"
                 mm_url = api_url[: api_url.rfind("api") ]
                 
