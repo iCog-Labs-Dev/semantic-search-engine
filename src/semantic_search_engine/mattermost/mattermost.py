@@ -1,10 +1,13 @@
 from time import time, sleep
 from sched import scheduler
-import shelve
+import os, shelve, requests, json
 
-from semantic_search_engine.constants import DEFAULT_LAST_FETCH_TIME, FETCH_INTERVAL_SHELVE, LAST_FETCH_TIME_SHELVE, MM_PAT_SHELVE
+from semantic_search_engine.constants import DEFAULT_LAST_FETCH_TIME, FETCH_INTERVAL_SHELVE, LAST_FETCH_TIME_SHELVE, MM_PAT_ID_SHELVE
 from semantic_search_engine.mattermost.mm_api import MattermostAPI as MMApi
 from datetime import datetime
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class Mattermost:
 
@@ -24,13 +27,10 @@ class Mattermost:
     def update_fetch_interval(self, interval):
         self.fetch_interval_in_seconds = interval
 
-    @staticmethod
-    def select_fields(response, fields):
-        return [{field: res[field] for field in fields} for res in response]
-
-    def get_all_channels(self, *fields: [str]):
-        all_channels = MMApi().mm_api_GET('/channels')
-        return self.select_fields(all_channels, fields)
+    def get_all_channels(self,  *fields: [str]):
+        all_channels = self.mm_api.mm_api_request('/channels')
+        channel_fields = [{field: res[field] for field in fields} for res in all_channels]
+        return channel_fields
 
     def scheduleFirstEvent(self, channels):
         print('scheduleFirstEvent')
@@ -81,7 +81,7 @@ class Mattermost:
             # Loop through all pages of posts for the channel
             while previous_post_id != '':
                 # Get the server response for each page of posts
-                posts_res = MMApi().mm_api_GET(
+                posts_res = self.mm_api.mm_api_request(
                     "/channels/" + channel["id"] + "/posts",
                     params=post_params
                 )
@@ -102,7 +102,7 @@ class Mattermost:
 
                 # try:
                 # for postId in posts_res['order']:
-                #     thread_res = MMApi().mm_api_GET(
+                #     thread_res = self.mm_api.mm_api_request(
                 #         f"/posts/{postId}/thread"
                 #     )
                 #     thread = ''
@@ -136,7 +136,7 @@ class Mattermost:
                         print('Message deleted!')
                     # Filter out any channel join and other type messages. Also filter out any empty string messages (only images, audio, ...)
                     elif (post['type']=='' and post['message']): # If the 'type' is empty, that means it's a normal message (instead of 'system_join_channel')
-                        user_details = MMApi().get_user_details(post['user_id'], 'first_name', 'last_name', 'username')
+                        user_details = self.mm_api.get_user_details(post['user_id'], 'first_name', 'last_name', 'username')
                         post['message'] = f"({ datetime.utcfromtimestamp(post['update_at'] / 1000).date() }) { user_details['name'] }: { post['message'] }"
                         filtered_posts.append(post)
 
@@ -182,10 +182,44 @@ class Mattermost:
             
         # Update global last_fetch_time
         self.last_fetch_time = current_time
+    
+    def create_new_pat(self, temp_access_token: str) -> str:
+        with shelve.open( MM_PAT_ID_SHELVE ) as pat_id:
+            mm_api_url = os.getenv("MM_API_URL")
+            authHeader = "Bearer " + temp_access_token # authenticate a user (through the MM API)
+            
+            if pat_id.get( MM_PAT_ID_SHELVE, False ):
+                # Delete the prev pat
+                res = requests.post(
+                    url=mm_api_url + '/users/tokens/revoke',
+                    data=json.dumps({ "token_id": pat_id[ MM_PAT_ID_SHELVE ] }),
+                    headers={ "Authorization": authHeader },
+                )
+                if res.status_code != requests.codes.ok or not res.json().get('status') == 'OK':
+                    raise Exception(f"Request failed with status code: ", res.status_code)
+                
+            # Create a new personal_access_token
+            res = requests.post(
+                url=mm_api_url + '/users/me/tokens',
+                data=json.dumps({ "description": "Mattermost Semantic Search" }),
+                headers={ 
+                    "Content-type": "application/json; charset=UTF-8",
+                    "Authorization": authHeader },
+            )
+            if res.status_code != requests.codes.ok:
+                print(res.json(), res.url, temp_access_token)
+                raise Exception(f"Request failed with status code: ", res.status_code)
+            
+            # Update the personal_access_token's id in shelve
+            pat_id[ MM_PAT_ID_SHELVE ] = res.json()['id']
 
+        return res.json()['token']
 
-    def start_sync(self):
+    def start_sync(self, temp_access_token: str):
         print('Starting mattermost data sync ...')
+
+        personal_access_token = self.create_new_pat(temp_access_token=temp_access_token)
+        self.mm_api = MMApi(access_token=personal_access_token)
         
         # Get the last fetch time from shelve file store
         with shelve.open(LAST_FETCH_TIME_SHELVE) as db: # handles the closing of the shelve file automatically with context manager
@@ -244,6 +278,7 @@ class Mattermost:
             # Reset last_fetch_time in shelve store
             with shelve.open(LAST_FETCH_TIME_SHELVE) as last_fetch_time:
                 last_fetch_time[LAST_FETCH_TIME_SHELVE] = DEFAULT_LAST_FETCH_TIME
+                self.last_fetch_time = DEFAULT_LAST_FETCH_TIME
                 print('Last fetch time reset!')
         except:
             print('No Chroma Collection!')
