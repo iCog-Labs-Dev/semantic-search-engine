@@ -1,4 +1,4 @@
-import os, requests, shelve
+import os, requests, json
 from semantic_search_engine.constants import MM_PAT_ID_SHELVE
 from dotenv import load_dotenv
 
@@ -86,14 +86,14 @@ class MattermostAPI:
         return self.get_details('posts', post_id, args)
 
 
-    def mm_api_request(self, route: str, params={}, method='GET', data={}):
+    def mm_api_request(self, route: str, params: dict={}, method: str='GET', data: dict={}):
         authHeader = "Bearer " + self.access_token # authenticate a user (through the MM API)
 
         res = requests.request(
             method=method,
             url=self.mm_api_url + route,
             params=params,
-            data=data,
+            data=json.dumps(data),
             headers={
                 "Content-type": "application/json; charset=UTF-8",
                 "Authorization": authHeader,
