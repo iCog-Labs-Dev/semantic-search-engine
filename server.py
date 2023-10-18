@@ -1,6 +1,6 @@
 import sys
 sys.path.append('./src')
-import os, requests, threading, shelve
+import os, requests, threading, shelve, json
 
 from time import sleep
 from flask import Flask, jsonify, request, Response
@@ -42,33 +42,34 @@ def admin_required(admin_only: bool):
     def login_required(func):
         @wraps(func)
         def decorated_function(*args, **kwargs):
+            print(dict(request.cookies))
             cookies = dict(request.cookies)
             auth_token = cookies.get('MMAUTHTOKEN')
             user_id = cookies.get('MMUSERID')
             if not (auth_token and user_id):
-                return 'You must login and send requests with credentials enabled!', 500
+                return Response(json.dumps({ 'message' : 'You must send requests with credentials enabled and be logged in!' }), status=403, mimetype='application/json')
             
             user_details = requests.get(
                 f'{mm_api_url}/users/me',
                 headers={ "Authorization": f"Bearer {cookies.get('MMAUTHTOKEN')}" },
             )
             if user_details.status_code != requests.codes.ok:
-                return 'Unauthorized! Your session might have expired.', 401
+                return Response(json.dumps({ 'message' : 'Unauthorized! Your session might have expired.' }), status=401, mimetype='application/json')
             
             user_email = user_details.json().get('email', '')
             user_roles = user_details.json().get('roles', '').split(' ')
 
             #Check if an invalid response is returned from the API
             if not (user_email and user_roles):
-                return 'Invalid user data!', 401
+                return Response(json.dumps({ 'message' : 'Invalid user data!' }), status=401, mimetype='application/json')
 
             #Check if the user has system_user role
             if not admin_only and 'system_user' not in user_roles:
-                return 'Unauthorized! You should be a Mattermost user', 401
+                return Response(json.dumps({ 'message' : 'Unauthorized! You should be a Mattermost user' }), status=401, mimetype='application/json')
             
             # Check if the route requires admin privileges or not
             if admin_only and 'system_admin' not in user_roles:     
-                return 'Unauthorized! You don\'t have Admin privileges!', 401
+                return Response(json.dumps({ 'message' : 'Unauthorized! You don\'t have Admin privileges!' }), status=401, mimetype='application/json')
             loggedin_user = {
                 'auth_token': auth_token,
                 'user_id': user_id,
@@ -79,7 +80,7 @@ def admin_required(admin_only: bool):
     return login_required
 
 @app.route('/', methods=['GET'])
-@admin_required(admin_only=True)
+# @admin_required(admin_only=True)
 def root_route():
     # return '''<h1>Hi ✋</h1>'''
     res = {}
@@ -94,18 +95,18 @@ def root_route():
         
     res['is_syncing'] = mattermost.is_syncing()
 
-    return res
+    return Response(json.dumps(res), status=200, mimetype='application/json')
 
 
-# ******************************************************** Get Current User ***************************************************
+# **************************************************************************************************************************** /
+# ****************************************************************************************************************************
 
+# =========== Test Auth ===========
 @app.route('/current_user', methods=['GET'])
 @admin_required(admin_only=False)
 def current_user(loggedin_user):
     print(loggedin_user)
-    return loggedin_user
-
-# **************************************************************************************************************************** /
+    return Response(json.dumps(loggedin_user), status=200, mimetype='application/json')
 
 # =========== Test Chroma ===========
 # TODO: remove this endpoint
@@ -116,7 +117,7 @@ def chroma_route(db):
         n_results = request.json['n_results']
         source = request.json['source']
         user_id = request.json['user_id']
-        channels_list = MM_Api().get_user_channels(user_id=user_id) if source == 'mm' else ['']
+        channels_list = MM_Api(access_token='x1p9oaut17gsdxqurhp9po6hoe').get_user_channels(user_id=user_id) if source == 'mm' else ['']
 
         res = collection.query(
                 query_texts=[query],
@@ -174,21 +175,22 @@ def semantic_search(loggedin_user):
         access_token = loggedin_user['auth_token']
 
         return semantic_client.semantic_search(
-                    query=query,
-                    user_id=user_id,
-                    access_token=access_token
-            ) 
+            query=query,
+            user_id=user_id,
+            access_token=access_token
+        ) 
 
     
 # ************************************************************** /start_sync
     
 @app.route('/start_sync', methods=['GET'])
 @admin_required(admin_only=True)
-def start_sync(loggedin_user):
+def start_sync(loggedin_user):#={'auth_token': 'x1p9oaut17gsdxqurhp9po6hoe'}):
+    print(loggedin_user)
     access_token = loggedin_user['auth_token']
     try:
-        sync_thread = threading.Thread(target=mattermost.start_sync)
-        sync_thread.start(access_token=access_token)
+        sync_thread = threading.Thread(target=mattermost.start_sync, args=(access_token,))
+        sync_thread.start()
     except: return 'Something went wrong while attempting to sync!'
 
     sleep(2)
