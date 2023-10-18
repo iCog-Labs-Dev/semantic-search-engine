@@ -10,6 +10,9 @@ from semantic_search_engine.mattermost.mm_api import MattermostAPI as MMApi
 from semantic_search_engine.slack.slack import Slack as Sl
 import os, shelve
 
+from json import dumps as to_json
+from flask import Response
+
 class SemanticSearch():
     """The entrypoint to the package that contains the necessary data to 
     make a semantic search.
@@ -90,38 +93,58 @@ class SemanticSearch():
         
         # Initialze MMApi with the user's access_token
         mm_api = MMApi(access_token=access_token)
+
         # Get the channels list for the user from Mattermost's API
         channels_list = mm_api.get_user_channels(user_id=user_id)
 
 
-
         #TODO: (Optional) Call a function to get a list of Slack channels as well
         # and append it to the channel_list
-        
-        query_result = self.collection.query(
-            query_texts=[query],
-            n_results=n_results,
-            # Get all messages from slack or specific channels that the user's a member of in MM
-            where = 
-                {
-                    "channel_id": { "$in": channels_list }
-                }
-        )
+
+        try:
+            query_result = self.collection.query(
+                query_texts=[query],
+                n_results=n_results,
+                # Get all messages from slack or specific channels that the user's a member of in MM
+                where = { "channel_id": { "$in": channels_list } }
+            )
+        except Exception as err:
+            return Response(to_json({
+                'message' : 'Failed to add to Chroma!',
+                'log': err
+                }), status=500, mimetype='application/json')
 
         # Get the details for each user, channel and message returned from chroma
-        details = self.get_metadata_details(mm_api, query_result["ids"][0], query_result["metadatas"][0], query_result["distances"][0])
+        try:
+            metadata_details = self.get_metadata_details(
+                mm_api=mm_api,
+                ids=query_result["ids"][0],
+                metadatas=query_result["metadatas"][0],
+                distances=query_result["distances"][0]
+            )
+        except Exception as err:
+            return Response(to_json({
+                'message' : 'Fetching context details failed!',
+                'log': err
+                }), status=500, mimetype='application/json')
 
         # Get the response from the LLM
-        llm_response = self.chain.run(
-            { 
-                "context" : '\n'.join( query_result["documents"][0] ),
-                "query" : query    
-            }
-        )
-
+        try:
+            llm_response = self.chain.run(
+                { 
+                    "context" : '\n'.join( query_result["documents"][0] ),
+                    "query" : query    
+                }
+            )
+        except Exception as err:
+            return Response(to_json({
+                'message' : 'LLM response failed!',
+                'log': err
+                }), status=500, mimetype='application/json')
+        
         return {
             "llm": llm_response,
-            "context": details
+            "context": metadata_details
         }
 
 
@@ -162,14 +185,12 @@ class SemanticSearch():
                     'name'
                 )
 
-                api_url = os.getenv("MM_API_URL")
                 # Look for "api" from the right and cut out the url after that...  "http://localhost:8065/api/v4"  -->  "http://localhost:8065/"
-                mm_url = api_url[: api_url.rfind("api") ]
+                # mm_url = api_url[: api_url.rfind("api") ]
                 
-                link_url = f"{ mm_url }{ team_data['name'] }"
-                
-                # real_name = f"{mm_data['first_name']} {mm_data['last_name']}"
-                # schema['user_name'] = real_name if real_name else mm_data['username']                
+                mm_url = os.getenv("MM_URL")
+                link_url = f"{ mm_url }/{ team_data['name'] }"
+                            
                 schema['user_name'] = user_data['name']                                                     # 1. user_name
                 schema['user_dm_link'] = f"{ link_url }/messages/@{ user_data['username'] }"                # 2. user_dm_link
 
@@ -191,7 +212,7 @@ class SemanticSearch():
 
                 sl_data = Sl.get_channel_details( metadata['channel_id'] )    
                 schema['channel_name'] = sl_data['name']                                                    # 3. channel_name 
-                # schema['channel_link'] = 'url/teamname/channels/' + schema['channel_name']                # 4. channel_link       (not applicable to slack)
+                # schema['channel_link'] = ...                                                              # 4. channel_link       (not applicable to slack)
             
                 sl_data = Sl.get_message_details( ids[idx] )   
                 schema['message'] = sl_data['text']                                                         # 5. message

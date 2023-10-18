@@ -94,15 +94,27 @@ class Slack:
 
     @staticmethod
     def get_channel_details(channel_id: str):
-        return Channel.select().where( Channel.channel_id==channel_id ).dicts().get()
+        try:
+            return Channel.select().where( Channel.channel_id==channel_id ).dicts().get()
+        except:
+            raise Exception('Failed to find "Channel" with id: ', channel_id)
+            
 
     @staticmethod
     def get_user_details(user_id: str):
-        return User.select().where( User.user_id==user_id ).dicts().get()
+        try:
+            return User.select().where( User.user_id==user_id ).dicts().get()
+        except:
+            raise Exception('Failed to find "User" with id: ', user_id)
+            
 
     @staticmethod
     def get_message_details(message_id: str):
-        return Message.select().where( Message.message_id==message_id ).dicts().get()
+        try:
+            return Message.select().where( Message.message_id==message_id ).dicts().get()
+        except:
+            raise Exception('Failed to find "Message" with id: ', message_id)
+            
 
     #TODO: (Optional) Implement a function that takes a Mattermost user_id / email and
     # returns a list of slack 'private' channels in which the user is a member of
