@@ -57,7 +57,7 @@ class SemanticSearch():
     You must answer the question based on only the list of messages you are given.
     Don't answer anything outside the context(messages) you are provided and do not respond with anything from your general knowledge.
     If the messages are not related to the question, respond with "This topic was not discussed previously".
-    Don't provide any explanations leading to your response. Your responses should be concise and straightforward. 
+    Do not provide any explanations leading to your response. Your responses should be concise and straightforward. 
     <</SYS>>\n
 [/INST]
 """
@@ -107,8 +107,7 @@ class SemanticSearch():
 
         # Get the channels list for the user from Mattermost's API
         mm_channels_list = mm_api.get_user_channels(user_id=user_info['user_id'])
-        #TODO: (Optional) Call a function to get a list of Slack channels as well
-        # and append it to the channel_list
+        # Get the channels list of Slack
         sl_channels_list = Sl.get_user_channels( user_info['email'] )
         # Concatenate the two lists to get the list of all channel_ids the user can access in Chroma
         channels_list = mm_channels_list + sl_channels_list

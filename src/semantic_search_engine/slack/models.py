@@ -6,7 +6,7 @@ class User (Model):
    user_id=CharField( column_name='user_id', unique=True, primary_key=True )
    name=CharField( column_name='name', null=True )
    real_name=CharField( column_name='real_name', null=True )
-   email=CharField( column_name='email', unique=True )
+   email=CharField( column_name='email' ) # unique=True
    is_bot=CharField( column_name='is_bot' )
    avatar=TextField( column_name='avatar', null=True )
    class Meta:
