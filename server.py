@@ -4,7 +4,7 @@ import os, requests, threading, shelve
 
 from json import dumps as to_json
 from time import sleep
-from flask import Flask, request, Response
+from flask import Flask, request, Response, send_file
 from flask_cors import CORS
 from functools import wraps
 # from flask_sse import sse
@@ -44,22 +44,22 @@ def login_required(admin_only: bool):
     def inner_decorator(func):
         @wraps(func)
         def decorated_function(*args, **kwargs):
-            print(dict(request.cookies))
             cookies = dict(request.cookies)
             auth_token = cookies.get('MMAUTHTOKEN')
             user_id = cookies.get('MMUSERID')
             if not (auth_token and user_id):
                 return Response(to_json({ 'message' : 'You must send requests with credentials enabled and be logged in!' }), status=400, mimetype='application/json')
             
-            user_details = requests.get(
+            res = requests.get(
                 f'{mm_api_url}/users/me',
                 headers={ "Authorization": f"Bearer {cookies.get('MMAUTHTOKEN')}" },
             )
-            if user_details.status_code != requests.codes.ok:
+            if res.status_code != requests.codes.ok:
                 return Response(to_json({ 'message' : 'Unauthorized! Your session might have expired.' }), status=401, mimetype='application/json')
             
-            user_email = user_details.json().get('email', '')
-            user_roles = user_details.json().get('roles', '').split(' ')
+            user_details = res.json()
+            user_email = user_details.get('email', '')
+            user_roles = user_details.get('roles', '').split(' ')
 
             #Check if an invalid response is returned from the API
             if not (user_email and user_roles):
@@ -74,12 +74,25 @@ def login_required(admin_only: bool):
                 return Response(to_json({ 'message' : 'Unauthorized! You don\'t have Admin privileges!' }), status=401, mimetype='application/json')
             loggedin_user = {
                 'auth_token': auth_token,
-                'user_id': user_id,
-                'email': user_email
+                'user_info': {
+                    'user_id': user_id,
+                    'name': f"{user_details.get('first_name', '')} {user_details.get('last_name', '')}".strip() or  user_details.get('username', ''),
+                    'email': user_email
+                }
             }
             return func(loggedin_user, *args, **kwargs)
         return decorated_function
     return inner_decorator
+
+
+
+# ************************************************************** /img
+
+@app.route('/img', methods=['GET'])
+def ping_img():
+    return send_file('./src/img/user.webp', mimetype='image/webp')
+
+# ************************************************************** /
 
 @app.route('/', methods=['GET'])
 @login_required(admin_only=True)
@@ -128,7 +141,7 @@ def semantic_search(loggedin_user):
         try:
             return semantic_client.semantic_search(
                 query=request.json.get('query'),
-                user_id=loggedin_user['user_id'],
+                user_info=loggedin_user['user_info'],
                 access_token=loggedin_user['auth_token']
             )
         except:
@@ -201,7 +214,7 @@ def save_slack_zip(loggedin_user):
             channel_details = slack.upload_slack_data_zip(file_path)    # Extract it and read the channel details
             os.remove(file_path)                                        # Delete the zip file
 
-            return Response(channel_details, status=201, mimetype='application/json')
+            return Response(to_json(channel_details), status=201, mimetype='application/json')
         
         except:
             return Response(to_json({
