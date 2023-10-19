@@ -23,31 +23,42 @@ class SemanticSearch():
         """        
         # Sample prompt
         # '''
-        # You are a helpful assistant, you will only answer the questions the Human asks. You will be given a chat message as context. \
-        # Write a response that explains the human query based on what is discussed in the chat message.You must answer questions using the context provided. \
-        # A metadata that contains data related to the chat message will be provided. 
-        # The metadata will be a json with a user key that represents the sender of the message and a ts key which is the timestamp of the time the chat message was sent. \
-        # Use this data to better explain the chat message. If there isn't enough context, simply reply "This topic was not discussed previously"
+        #  * Your name is SNET and you are a helpful semantic search assistant.
+        # * You will be given a sequence of chat messages as context. 
+        # * Write a response that answers the question based on what is given to you as context in the chat messages.
+        # * You must answer the question based on only chat messages you are given.
+        # * Don't answer anything outside the context you are provided and do not respond with anything from your general knowledge.
+        # * Try to mention the ones that you get the context from.
+    # Try to mention the people that you get the context from and the times the messages were posted.
+        # * If there isn't enough context, simply reply "This topic was not discussed previously"
         # '''
         # prompt template to be used by a chain
         self.prompt_template = PromptTemplate(
-            input_variables=["context", "query"],
+            input_variables=["context", "query", "user"],
 
             # the system prompt needs work
             template="""
 [INST]\n
     <<SYS>>
-        * Your name is SNET and you are a helpful semantic search assistant.
-        * You will be given a sequence of chat messages as context. 
-        * Write a response that answers the question based on what is given to you as context in the chat messages.
-        * You must answer the question based on only chat messages you are given.
-        * Don't answer anything outside the context you are provided and do not respond with anything from your general knowledge.
-        * Try to mention the ones that you get the context from.
-        * If there isn't enough context, simply reply "This topic was not discussed previously"
-    <</SYS>>\n
+    You are a helpful assistant and your name is Llama.
+    Look at the following chat messages between the triple quotes.
 
-    ### Context (chat messages): \n\n{context}\n\n
-    ### Query: {query}\n
+    ### Chat messages:
+    ```
+    \n{context}\n
+    ```
+
+    The following question is asked by '{user}'.
+
+    ### Question: 
+    \n{query}\n
+    
+    Write a response that answers the question based on what is discussed in the chat messages.
+    You must answer the question based on only the list of messages you are given.
+    Don't answer anything outside the context(messages) you are provided and do not respond with anything from your general knowledge.
+    If the messages are not related to the question, respond with "This topic was not discussed previously".
+    Don't provide any explanations leading to your response. Your responses should be concise and straightforward. 
+    <</SYS>>\n
 [/INST]
 """
         )
@@ -70,7 +81,7 @@ class SemanticSearch():
         # Get or create a chroma collection
         self.collection = get_chroma_collection(self.embedding_function)
 
-    def semantic_search(self, query : str, user_id: str, access_token: str):
+    def semantic_search(self, query : str, user_info: dict, access_token: str):
         """executes a semantic search on an LLM based on a certain query from a\
         vector db.
 
@@ -95,11 +106,12 @@ class SemanticSearch():
         mm_api = MMApi(access_token=access_token)
 
         # Get the channels list for the user from Mattermost's API
-        channels_list = mm_api.get_user_channels(user_id=user_id)
-
-
+        mm_channels_list = mm_api.get_user_channels(user_id=user_info['user_id'])
         #TODO: (Optional) Call a function to get a list of Slack channels as well
         # and append it to the channel_list
+        sl_channels_list = Sl.get_user_channels( user_info['email'] )
+        # Concatenate the two lists to get the list of all channel_ids the user can access in Chroma
+        channels_list = mm_channels_list + sl_channels_list
 
         try:
             query_result = self.collection.query(
@@ -133,7 +145,9 @@ class SemanticSearch():
             llm_response = self.chain.run(
                 { 
                     "context" : '\n'.join( query_result["documents"][0] ),
-                    "query" : query    
+                    "query" : query,
+                    "user": user_info['name']
+                    # "query" : f"{ user_info['name'] }: { query }"
                 }
             )
         except Exception as err:
