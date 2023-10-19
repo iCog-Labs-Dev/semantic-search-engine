@@ -3,6 +3,7 @@ from zipfile import ZipFile
 from semantic_search_engine.slack.save import save_channel_messages, save_channels_data, save_users_data
 from semantic_search_engine.slack.models import User, Channel, ChannelMember, Message
 from semantic_search_engine.constants import TEMP_SLACK_DATA_PATH
+from . import db
 
 class Slack:
 
@@ -98,7 +99,7 @@ class Slack:
             return Channel.select().where( Channel.channel_id==channel_id ).dicts().get()
         except:
             raise Exception('Failed to find "Channel" with id: ', channel_id)
-            
+
 
     @staticmethod
     def get_user_details(user_id: str):
@@ -120,3 +121,20 @@ class Slack:
     # returns a list of slack 'private' channels in which the user is a member of
     # def get_user_channels(user_id / email)
     # This can be done after the OAUTH feature is complete
+
+    @staticmethod
+    def get_user_channels(user_email: str) -> [str]:
+        try:
+            channel_members = []
+            with db.atomic():
+                # Get the user's id corresponding to the email
+                user_id = User.select().where( User.email==user_email ).dicts().get()['user_id']
+                # Get the channel ids corrensponding to the user_id
+                rows = ChannelMember.select(ChannelMember.channel_id).where( ChannelMember.user_id==user_id )
+                for row in rows:
+                    channel_members.append(row.channel_id)
+
+            print(channel_members)
+            return channel_members
+        except:
+            raise Exception(f'Failed to find "User Channels" with email: "{user_email}"')
