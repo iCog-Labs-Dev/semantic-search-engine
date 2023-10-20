@@ -98,7 +98,7 @@ class Slack:
         try:
             return Channel.select().where( Channel.channel_id==channel_id ).dicts().get()
         except:
-            raise Exception('Failed to find "Channel" with id: ', channel_id)
+            raise Exception(f'Failed to find "Channel" with id: {channel_id}')
 
 
     @staticmethod
@@ -106,7 +106,7 @@ class Slack:
         try:
             return User.select().where( User.user_id==user_id ).dicts().get()
         except:
-            raise Exception('Failed to find "User" with id: ', user_id)
+            raise Exception(f'Failed to find "User" with id: {user_id}')
             
 
     @staticmethod
@@ -114,23 +114,23 @@ class Slack:
         try:
             return Message.select().where( Message.message_id==message_id ).dicts().get()
         except:
-            raise Exception('Failed to find "Message" with id: ', message_id)
+            raise Exception(f'Failed to find "Message" with id: {message_id}')
             
 
     @staticmethod
     def get_user_channels(user_email: str) -> [str]:
+        member_channels = []
         try:
-            channel_members = []
             with db.atomic():
                 # Get the user's id corresponding to the email
                 user_id = User.select().where( User.email==user_email ).dicts().get()['user_id']
                 # Get the channel ids corrensponding to the user_id
                 rows = ChannelMember.select(ChannelMember.channel_id).where( ChannelMember.user_id==user_id )
                 for row in rows:
-                    channel_members.append(row.channel_id)
+                    member_channels.append(row.channel_id)
 
-            print(channel_members)
-            return channel_members
+            print(member_channels)
         except:
             print(f'Failed to find "User Channels" with email: "{user_email}"')
-            return []
+        
+        return member_channels

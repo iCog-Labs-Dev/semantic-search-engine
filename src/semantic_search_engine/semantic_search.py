@@ -134,7 +134,7 @@ class SemanticSearch():
         if not filtered_indices:
             return {
             "llm": "Unable to find conversations related to your query.",
-            "context": {}
+            "context": []
             }
 
         # Get the details for each user, channel and message returned from chroma
@@ -181,6 +181,7 @@ class SemanticSearch():
         for idx, metadata in enumerate(metadatas):
             
             schema = {
+                "user_id":"",
                 "user_name":"",
                 "user_dm_link": "",
                 "channel_name":"",
@@ -193,30 +194,33 @@ class SemanticSearch():
                 "score":""
             }
             if metadata['source']=='mm':
-                user_data = mm_api.get_user_details(
-                    metadata['user_id'],
-                    'first_name', 'last_name', 'username'
-                    )
-                channel_data = mm_api.get_channel_details(
-                    metadata['channel_id'],
-                    'name', 'display_name', 'team_id'
-                    )
+                try:
+                    user_data = mm_api.get_user_details(
+                        metadata['user_id'],
+                        'first_name', 'last_name', 'username'
+                        )
+                    channel_data = mm_api.get_channel_details(
+                        metadata['channel_id'],
+                        'name', 'display_name', 'team_id'
+                        )
 
-                post_data = mm_api.get_post_details(
-                    ids[idx],
-                    'id', 'message', 'update_at' # create_at
+                    post_data = mm_api.get_post_details(
+                        ids[idx],
+                        'id', 'message', 'update_at' # create_at
+                        )
+                    team_data = mm_api.get_team_details(
+                        channel_data['team_id'],
+                        'name'
                     )
-                team_data = mm_api.get_team_details(
-                    channel_data['team_id'],
-                    'name'
-                )
+                except: continue    # Skip context that lack any detail
 
                 # Look for "api" from the right and cut out the url after that...  "http://localhost:8065/api/v4"  -->  "http://localhost:8065/"
                 # mm_url = api_url[: api_url.rfind("api") ]
                 
                 mm_url = os.getenv("MM_URL")
                 link_url = f"{ mm_url }/{ team_data['name'] }"
-                            
+
+                schema['user_id'] = ids[idx]                                                                # 0. user_id
                 schema['user_name'] = user_data['name']                                                     # 1. user_name
                 schema['user_dm_link'] = f"{ link_url }/messages/@{ user_data['username'] }"                # 2. user_dm_link
 
@@ -232,18 +236,22 @@ class SemanticSearch():
                 schema['score'] = 1 - distances[idx]                                                        # 10. score
             
             elif metadata['source']=='sl':
-                sl_data = Sl.get_user_details( metadata['user_id'] )              
-                schema['user_name'] = sl_data['real_name'] or sl_data['name']                               # 1. user_name
-                # schema['user_dm_link'] = ...                                                              # 2. user_dm_link  (not applicable to slack)
+                try:
+                    sl_user_data = Sl.get_user_details( metadata['user_id'] )              
+                    sl_channel_data = Sl.get_channel_details( metadata['channel_id'] )    
+                    sl_message_data = Sl.get_message_details( ids[idx] )
+                except: continue    # Skip context that lack any detail
 
-                sl_data = Sl.get_channel_details( metadata['channel_id'] )    
-                schema['channel_name'] = sl_data['name']                                                    # 3. channel_name 
+                # schema['user_id'] = ids[idx]                                                              # 0. user_id            (not necessary for slack)
+                schema['user_name'] = sl_user_data['real_name'] or sl_user_data['name']                     # 1. user_name
+                # schema['user_dm_link'] = ...                                                              # 2. user_dm_link       (not applicable to slack)
+
+                schema['channel_name'] = sl_channel_data['name']                                            # 3. channel_name 
                 # schema['channel_link'] = ...                                                              # 4. channel_link       (not applicable to slack)
             
-                sl_data = Sl.get_message_details( ids[idx] )   
-                schema['message'] = sl_data['text']                                                         # 5. message
+                schema['message'] = sl_message_data['text']                                                 # 5. message
                 # schema['message_link'] = ...                                                              # 6. message_link       (not applicable to slack)
-                ts = round( datetime.timestamp( sl_data['time'] ) , 3)
+                ts = round( datetime.timestamp( sl_message_data['time'] ) , 3)
                 schema['time'] = ts                                                                         # 7. time
 
                 schema['source'] = metadata['source']                                                       # 8. source (sl)
