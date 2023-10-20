@@ -1,4 +1,5 @@
 import sys
+import time
 sys.path.append('./src')
 import os, requests, threading, shelve
 
@@ -223,29 +224,45 @@ def save_slack_zip(loggedin_user):
             }), status=500, mimetype='application/json')
 
 # ************************************************************** /store_slack_data
+# @app.route('/time')
+# def time_stream():
+#     def generate_time():
+#         while True:
+#             yield f"data: {time.strftime('%H:%M:%S')}\n\n"
+#             time.sleep(1)
+#     return Response(generate_time(), content_type='text/event-stream')
 
 @app.route('/store_slack_data', methods= ['GET', 'POST'])
-@login_required(admin_only=True)
-def store_data(loggedin_user):
-    if request.method == 'GET':
-        return '''<pre><h4> Send a POST request: <br>
-    {   
-        "channel_id" : {
-            "store_all" : true | false,
-            "store_none" : true | false,
-            "start_date" : (start date in POSIX time),
-            "end_date" : (end date in POSIX time)
-        },
-        ...
-    } </h4></pre>'''
+# @login_required(admin_only=True)
+def store_data():
+    # if request.method == 'GET':
+    #     return '''<pre><h4> Send a POST request: <br>
+    # {   
+    #     "channel_id" : {
+    #         "store_all" : true | false,
+    #         "store_none" : true | false,
+    #         "start_date" : (start date in POSIX time),
+    #         "end_date" : (end date in POSIX time)
+    #     },
+    #     ...
+    # } </h4></pre>'''
 
-    elif request.method == 'POST':
+    # elif request.method == 'POST':
+    if True:
         try:
-            channel_specs = request.get_json()
-            slack.store_slack_data(channel_specs=channel_specs)
+            # channel_specs = request.get_json()
+            channel_specs = {'C05D1SE01B7': {'store_all': True, 'store_none': False, 'start_date': 1687165577, 'end_date': 1697805748.681}, 'C05D77W3N76': {'store_all': True, 'store_none': False, 'start_date': 1687165577, 'end_date': 1697805748.681}, 'C05D7863DRA': {'store_all': True, 'store_none': False, 'start_date': 1687165686, 'end_date': 1697805748.681}, 'C05ABCDE01': {'store_all': True, 'store_none': False, 'start_date': 1687166738, 'end_date': 1697805748.681}}
+            # slack.store_slack_data(channel_specs=channel_specs)
             #TODO: should return progress in real-time (channel by channel)
 
-            return Response(to_json( 'Slack data stored!' ), status=201, mimetype='application/json')
+            # def generate_time():
+            #     while True:
+            #         yield f"data: {time.strftime('%H:%M:%S')}\n\n"
+            #         time.sleep(1)
+            # return Response(slack.test_yield(), content_type='text/event-stream')
+
+            # return Response(to_json( 'Slack data stored!' ), status=201, mimetype='application/json')
+            return Response(slack.store_slack_data(channel_specs=channel_specs), content_type='text/event-stream')
         
         except:
              return Response(to_json({

@@ -1,5 +1,7 @@
 import os, json, re
 from datetime import datetime
+
+from flask import Response
 from semantic_search_engine.slack.models import User, Channel, ChannelMember, Message
 from semantic_search_engine.constants import TEMP_SLACK_DATA_PATH
 from peewee import chunked
@@ -7,6 +9,7 @@ from . import db
 
 
 def save_users_data() -> None:
+
     """reads users' relevant info from users.json and save it to Sqlite db
     """
     # Create a User table if it doesn't exist
@@ -177,6 +180,10 @@ def save_channel_messages(collection, saved_channels: [dict], channel_specs: [di
                 )
                 print('Done!')
             else: print('The channel is empty!')
+
+            # yield 'Channel'
+            # yield Response(json.dumps( 'Slack data stored!' ), status=201, mimetype='application/json')
+            yield f"data: { 'Done and done!' }\n\n"
 
 # Hello <@user_id> -->  Hello user_name
 def replace_slack_handles(message: str) -> str:
