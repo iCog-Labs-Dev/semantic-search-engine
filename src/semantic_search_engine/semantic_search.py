@@ -220,7 +220,7 @@ class SemanticSearch():
                 mm_url = os.getenv("MM_URL")
                 link_url = f"{ mm_url }/{ team_data['name'] }"
 
-                schema['user_id'] = ids[idx]                                                                # 0. user_id
+                schema['user_id'] = metadata['user_id']                                                     # 0. user_id
                 schema['user_name'] = user_data['name']                                                     # 1. user_name
                 schema['user_dm_link'] = f"{ link_url }/messages/@{ user_data['username'] }"                # 2. user_dm_link
 
@@ -242,7 +242,7 @@ class SemanticSearch():
                     sl_message_data = Sl.get_message_details( ids[idx] )
                 except: continue    # Skip context that lack any detail
 
-                # schema['user_id'] = ids[idx]                                                              # 0. user_id            (not necessary for slack)
+                # schema['user_id'] = metadata['user_id']                                                   # 0. user_id            (not necessary for slack)
                 schema['user_name'] = sl_user_data['real_name'] or sl_user_data['name']                     # 1. user_name
                 # schema['user_dm_link'] = ...                                                              # 2. user_dm_link       (not applicable to slack)
 
