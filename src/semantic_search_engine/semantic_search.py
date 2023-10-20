@@ -1,7 +1,7 @@
 from chromadb import EmbeddingFunction
 from semantic_search_engine.llm import TogetherLLM
 from semantic_search_engine.chroma import  get_chroma_collection
-from semantic_search_engine.constants import CHROMA_N_RESULTS_SHELVE
+from semantic_search_engine.constants import CHROMA_N_RESULTS_SHELVE, DEFAULT_MAX_CHROMA_DISTANCE
 from langchain import LLMChain, PromptTemplate
 from chromadb.utils import embedding_functions
 from langchain.llms.base import LLM
@@ -124,15 +124,28 @@ class SemanticSearch():
                 'message' : 'Failed to add to Chroma!',
                 'log': err
                 }), status=500, mimetype='application/json')
+        
+        # Filter out the results with distances below a certain threshold
+        filtered_indices = []
+        for idx, distance in enumerate(query_result["distances"][0]):
+            if distance < DEFAULT_MAX_CHROMA_DISTANCE:
+                filtered_indices.append(idx)
+
+        if not filtered_indices:
+            return {
+            "llm": "Unable to find conversations related to your query.",
+            "context": {}
+            }
 
         # Get the details for each user, channel and message returned from chroma
         try:
             metadata_details = self.get_metadata_details(
                 mm_api=mm_api,
-                ids=query_result["ids"][0],
-                metadatas=query_result["metadatas"][0],
-                distances=query_result["distances"][0]
+                ids=[ query_result["ids"][0][idx] for idx in filtered_indices ],
+                metadatas=[ query_result["metadatas"][0][idx] for idx in filtered_indices ],
+                distances=[ query_result["distances"][0][idx] for idx in filtered_indices ]
             )
+            print(metadata_details)
         except Exception as err:
             return Response(to_json({
                 'message' : 'Fetching context details failed!',
@@ -143,7 +156,7 @@ class SemanticSearch():
         try:
             llm_response = self.chain.run(
                 { 
-                    "context" : '\n'.join( query_result["documents"][0] ),
+                    "context" : '\n'.join( [ query_result["documents"][0][idx] for idx in filtered_indices ] ),
                     "query" : query,
                     "user": user_info['name']
                     # "query" : f"{ user_info['name'] }: { query }"
