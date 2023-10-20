@@ -19,18 +19,18 @@ TEMP_SLACK_DATA_PATH = os.path.join(SQLITE_PATH, 'temp/')
 TOGETHER_API_KEY = os.environ.get("TOGETHER_API_KEY")
 TOGETHER_MODEL_NAME = os.environ.get("TOGETHER_MODEL_NAME") or "togethercomputer/llama-2-70b-chat"
 
-# Mattermost    # TODO: Replace these with the client_id and client_secret required for oauth
-MM_USER_NAME = "Admin"
-MM_PASSWORD = "password"
-
-# Defaults
-DEFAULT_FETCH_INTERVAL = 15 * 60    # Default fetch interval in minutes
+# Default MM Sync Settings
+DEFAULT_FETCH_INTERVAL = 15 * 60    # fetch interval in minutes
 DEFAULT_LAST_FETCH_TIME = 0
+# Default Chroma Settings
 DEFAULT_CHROMA_N_RESULTS = 25
+DEFAULT_MAX_CHROMA_DISTANCE = 0.6
+# Default LLM Settings
+DEFAULT_LLM_TEMPERATURE = 2
+DEFAULT_LLM_MAX_TOKENS = 1024
 
 # Shelve
 SHELVE_PATH = os.path.join(DIR, 'shelve')
-# SHELVE_FIELD = 'value'
 
 LAST_FETCH_TIME_SHELVE = os.path.join(SHELVE_PATH, "last_fetch_time")
 FETCH_INTERVAL_SHELVE = os.path.join(SHELVE_PATH, "fetch_interval")
