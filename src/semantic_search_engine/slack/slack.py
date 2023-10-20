@@ -117,11 +117,6 @@ class Slack:
             raise Exception('Failed to find "Message" with id: ', message_id)
             
 
-    #TODO: (Optional) Implement a function that takes a Mattermost user_id / email and
-    # returns a list of slack 'private' channels in which the user is a member of
-    # def get_user_channels(user_id / email)
-    # This can be done after the OAUTH feature is complete
-
     @staticmethod
     def get_user_channels(user_email: str) -> [str]:
         try:
@@ -137,4 +132,5 @@ class Slack:
             print(channel_members)
             return channel_members
         except:
-            raise Exception(f'Failed to find "User Channels" with email: "{user_email}"')
+            print(f'Failed to find "User Channels" with email: "{user_email}"')
+            return []
