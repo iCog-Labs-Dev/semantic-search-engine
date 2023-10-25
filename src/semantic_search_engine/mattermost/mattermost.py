@@ -1,13 +1,10 @@
+import shelve
 from time import time, sleep
 from sched import scheduler
-import os, shelve, requests, json
 
 from semantic_search_engine.constants import DEFAULT_LAST_FETCH_TIME, FETCH_INTERVAL_SHELVE, LAST_FETCH_TIME_SHELVE, MM_PAT_ID_SHELVE
 from semantic_search_engine.mattermost.mm_api import MattermostAPI as MMApi
 from datetime import datetime
-from dotenv import load_dotenv
-
-load_dotenv()
 
 class Mattermost:
 
@@ -20,7 +17,7 @@ class Mattermost:
         with shelve.open(LAST_FETCH_TIME_SHELVE) as last_fetch_time:
             self.last_fetch_time = int(last_fetch_time[LAST_FETCH_TIME_SHELVE])
     
-    nextFetchScheduler = scheduler(time, sleep)
+    next_fetch_scheduler = scheduler(time, sleep)
     LAST_FETCH_TIME_SHELVE = LAST_FETCH_TIME_SHELVE
 
     # For real-time update of the fetch interval (without reinstantiating the 'Mattermost' Class)
@@ -32,27 +29,19 @@ class Mattermost:
         channel_fields = [{field: res[field] for field in fields} for res in all_channels]
         return channel_fields
 
-    def scheduleFirstEvent(self, channels):
-        print('scheduleFirstEvent')
+    def schedule_first_event(self, channels):
+        print('schedule_first_event')
         # Add an event to the scheduler
-        self.nextFetchScheduler.enter(
+        self.next_fetch_scheduler.enter(
             0,
             1, # priority
             self.get_posts_for_all_channels, # function to run when the event is triggered
-            [self.nextFetchScheduler, channels] # arguments to pass to the function
+            [self.next_fetch_scheduler, channels] # arguments to pass to the function
         ) 
 
     def get_posts_for_all_channels(self, scheduler, channels):
         print(f"\n {'*'*50} \n")
         print('Fetching posts for all channels ...')
-
-        # Register next schedule
-        scheduler.enter(
-            self.fetch_interval_in_seconds, 
-            1, 
-            self.get_posts_for_all_channels, 
-            [scheduler, channels]
-        )
 
         # calculate the time passed since lastFetchTIme
         time_passed_in_seconds = (time() - self.last_fetch_time)
@@ -175,6 +164,14 @@ class Mattermost:
         
         print('Total posts fetched: ', no_posts)
 
+        # Register next schedule
+        scheduler.enter(
+            self.fetch_interval_in_seconds, 
+            1, 
+            self.get_posts_for_all_channels, 
+            [scheduler, channels]
+        )
+
         # Update last_fetch_time in shelve store
         with shelve.open(LAST_FETCH_TIME_SHELVE) as db: # handles the closing of the shelve file automatically with context manager
             # Set the last fetch time to the current time for next api call
@@ -184,89 +181,79 @@ class Mattermost:
         self.last_fetch_time = current_time
     
     def create_new_pat(self, temp_access_token: str) -> str:
+        mm_api = MMApi(access_token=temp_access_token)
+        print(temp_access_token)
+
         with shelve.open( MM_PAT_ID_SHELVE ) as pat_id:
-            mm_api_url = os.getenv("MM_API_URL")
             authHeader = "Bearer " + temp_access_token # authenticate a user (through the MM API)
             
             if pat_id.get( MM_PAT_ID_SHELVE, False ):
                 # Delete the prev pat
-                res = requests.post(
-                    url=mm_api_url + '/users/tokens/revoke',
-                    data=json.dumps({ "token_id": pat_id[ MM_PAT_ID_SHELVE ] }),
-                    headers={ "Authorization": authHeader },
+                res = mm_api.mm_api_request(
+                    route='/users/tokens/revoke',
+                    method='POST',
+                    data={ 'token_id': pat_id[ MM_PAT_ID_SHELVE ] }
                 )
-                if res.status_code != requests.codes.ok or not res.json().get('status') == 'OK':
-                    raise Exception(f"Request failed with status code: ", res.status_code)
+                if not res.get('status') == 'OK':
+                    print("Failed to delete previous personal access token!")
                 
             # Create a new personal_access_token
-            res = requests.post(
-                url=mm_api_url + '/users/me/tokens',
-                data=json.dumps({ "description": "Mattermost Semantic Search" }),
-                headers={ 
-                    "Content-type": "application/json; charset=UTF-8",
-                    "Authorization": authHeader },
+            res = mm_api.mm_api_request(
+                route='/users/me/tokens',
+                method='POST',
+                data={ 'description': 'Mattermost Semantic Search' }
             )
-            if res.status_code != requests.codes.ok:
-                print(res.json(), res.url, temp_access_token)
-                raise Exception(f"Request failed with status code: ", res.status_code)
+            print(res)
+            if not (res.get('id') or res.get('token')):
+                raise Exception('Failed to create a new personal access token!')
             
             # Update the personal_access_token's id in shelve
-            pat_id[ MM_PAT_ID_SHELVE ] = res.json()['id']
+            pat_id[ MM_PAT_ID_SHELVE ] = res['id']
 
-        return res.json()['token']
+        return res['token']
 
-    def start_sync(self, temp_access_token: str):
-        print('Starting mattermost data sync ...')
+    def start_sync(self, temp_access_token: str) -> None:
 
-        personal_access_token = self.create_new_pat(temp_access_token=temp_access_token)
-        self.mm_api = MMApi(access_token=personal_access_token)
-        
         # Get the last fetch time from shelve file store
         with shelve.open(LAST_FETCH_TIME_SHELVE) as db: # handles the closing of the shelve file automatically with context manager
             if LAST_FETCH_TIME_SHELVE in db:
                 last_fetch_time = db[LAST_FETCH_TIME_SHELVE]
             else:
                 last_fetch_time = 0
-            db.close()
-        
-        # calculate the time passed since lastFetchTIme
-        time_passed_in_seconds = (time() - last_fetch_time)
-        print('Time passed since last fetch MAIN: ', time_passed_in_seconds)
 
+        if last_fetch_time == 0: # No posts have been fetched before
+            self.stop_sync() # cancel any previously scheduled events
+            print('Fetching all posts for the first time...')
+
+        if self.is_syncing(): 
+            print('Sync has already started!')
+            return
+
+        # Create a new personal access token for the Admin
+        personal_access_token = self.create_new_pat(temp_access_token=temp_access_token)
+        # Set the global MMApi instance with the new pat of the Admin
+        self.mm_api = MMApi(access_token=personal_access_token)
+        
         all_channels = self.get_all_channels('id', 'type') # get all channels' id and type
 
-        if last_fetch_time == 0: # This are no posts in the database
-            print('Fetching all posts for the first time...')
-            
-            self.stop_sync() # cancel all previously scheduled events
-            
-            self.scheduleFirstEvent(all_channels) # schedule the first event
-            
-            self.nextFetchScheduler.run() # run the scheduled events
-        
-        elif last_fetch_time != 0 and self.nextFetchScheduler.empty(): 
-            self.scheduleFirstEvent(all_channels)
-            self.nextFetchScheduler.run()   
+        self.schedule_first_event(all_channels) # schedule the first event
+        self.next_fetch_scheduler.run() # run the scheduled events
 
-        if time_passed_in_seconds < self.fetch_interval_in_seconds:
-            print("It's not time to fetch posts yet")
-
-        return 'Synchronizing ...'
+        # TODO: SSE to indicate that syncing is complete
 
 
-    def stop_sync(self):
-        print('Stopping mattermost data sync ...')
-        
-        if not self.nextFetchScheduler.empty():
-            for event in self.nextFetchScheduler.queue:
+    def stop_sync(self) -> None:
+
+        if not self.next_fetch_scheduler.empty():
+            for event in self.next_fetch_scheduler.queue:
                 # print('event: ', event)
-                self.nextFetchScheduler.cancel(event)
+                self.next_fetch_scheduler.cancel(event) # Cancel each event in the scheduler queue
 
-        print('The scheduler is', 'empty!' if self.nextFetchScheduler.empty() else 'NOT empty!')
-        return 'Stopped!'
+        print('Not Syncing!')
+        # TODO: SSE to indicate that syncing has stopped
 
     def is_syncing(self):
-        return not self.nextFetchScheduler.empty()
+        return not self.next_fetch_scheduler.empty()
 
     def reset_mattermost(self):
         self.stop_sync()

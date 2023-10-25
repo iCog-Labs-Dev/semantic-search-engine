@@ -13,9 +13,11 @@ class TogetherLLM(LLM):
     model: str = TOGETHER_MODEL_NAME
     together_api_key: str = TOGETHER_API_KEY
 
-    temperature: float = 0.7
+    temperature: float = 2
+    max_tokens: int = 1024
 
-    max_tokens: int = 512
+    # temperature: float = 0.7
+    # max_tokens: int = 512
 
     class Config:
         extra = Extra.forbid

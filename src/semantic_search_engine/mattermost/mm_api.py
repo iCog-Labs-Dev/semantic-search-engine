@@ -31,8 +31,7 @@ class MattermostAPI:
             all_channels.extend(channels_in_team)
 
         all_channels = list({v['id']:v for v in all_channels}.values()) # make the channels list unique
-
-        print('Total no. of channels: ', len(all_channels))
+        # print('Total no. of channels: ', len(all_channels))
         
         return [ch['id'] for ch in all_channels]
 
@@ -89,42 +88,22 @@ class MattermostAPI:
     def mm_api_request(self, route: str, params: dict={}, method: str='GET', data: dict={}):
         authHeader = "Bearer " + self.access_token # authenticate a user (through the MM API)
 
-        res = requests.request(
-            method=method,
-            url=self.mm_api_url + route,
-            params=params,
-            data=json.dumps(data),
-            headers={
-                "Content-type": "application/json; charset=UTF-8",
-                "Authorization": authHeader,
-            },
-        )
+        try:
+            res = requests.request(
+                method=method,
+                url=self.mm_api_url + route,
+                params=params,
+                data=json.dumps(data),
+                headers={
+                    "Content-type": "application/json; charset=UTF-8",
+                    "Authorization": authHeader,
+                },
+            )
+        except Exception as err:
+            raise Exception(f"Request to Mattermost's API failed: ", err)
         
         # Guard against bad requests
         if res.status_code != requests.codes.ok:
             raise Exception(f"Request to '{route}' failed with status code: ", res.status_code)
             
         return res.json()
-
-
-
-
-
-"""
-    # user_id -> realname 
-    # message_id -> time sent
-    # channel_id -> channel name
-
-Mattermost().get_user_details('ioff979djbn97juwtkx9cizq9e', 'first_name', 'last_name', 'username', 'email')             # Admin
-Mattermost().get_user_details('r3dhbuhw9f8gjpwyexd7ex4iuy', 'first_name', 'last_name', 'username', 'email', 'is_bot')   # Feedback-bot
-
-Mattermost().get_channel_details('9wgspwmu53y6mg1s6dpsbjzagy', 'name', 'display_name', 'type', 'team_id')   # hyperon           (public)
-Mattermost().get_channel_details('z4kqay9m1jdxipatytm7eyteur', 'name', 'display_name', 'type', 'team_id')   # icog-hyperon-team (private)
-
-Mattermost().get_post_details('u95bn1e1kiyg8d98hor7rwupwh', 'message', 'type', 'channel_id', 'user_id')     # Hello
-Mattermost().get_post_details('e68a8f4gsjya7g4isfujyej1fe', 'message', 'type', 'channel_id', 'user_id')     # Channel join
-
-print( Mattermost().get_user_channels('ioff979djbn97juwtkx9cizq9e', 'id', 'type', 'name') )
-
-Mattermost().get_all_channels('id', 'name', 'total_msg_count')
-"""
