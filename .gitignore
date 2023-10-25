@@ -6,6 +6,7 @@ environment.py
 
 chroma_db/
 db/
+sqlite/
 temp/
 shelve/
 
