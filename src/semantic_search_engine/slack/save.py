@@ -65,12 +65,12 @@ def save_channels_data(channel_ids: [str]) -> [dict]:
             }
             channels.append(channel_data)
             
-            channel_member_data =  {
-                'channel_id': channel['id'],
-                'user_ids': json.dumps( channel['members'] ),
-                'no_members': len( channel['members'] )
-            }
-            channel_members.append(channel_member_data)
+            for member_user_id in channel['members']:
+                channel_member =  {
+                    'channel_id': channel['id'],
+                    'user_id': member_user_id
+                }
+                channel_members.append(channel_member)
 
             saved_channels.append({
                 'id': channel['id'],

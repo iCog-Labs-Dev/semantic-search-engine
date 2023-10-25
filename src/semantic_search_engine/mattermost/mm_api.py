@@ -31,8 +31,7 @@ class MattermostAPI:
             all_channels.extend(channels_in_team)
 
         all_channels = list({v['id']:v for v in all_channels}.values()) # make the channels list unique
-
-        print('Total no. of channels: ', len(all_channels))
+        # print('Total no. of channels: ', len(all_channels))
         
         return [ch['id'] for ch in all_channels]
 
