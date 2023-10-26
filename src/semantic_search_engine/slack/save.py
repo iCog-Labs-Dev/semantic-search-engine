@@ -1,7 +1,9 @@
-import os, json
+import os, json, re
 from datetime import datetime
 from semantic_search_engine.slack.models import User, Channel, ChannelMember, Message
 from semantic_search_engine.constants import TEMP_SLACK_DATA_PATH
+from peewee import chunked
+from . import db
 
 
 def save_users_data() -> None:
@@ -14,18 +16,20 @@ def save_users_data() -> None:
         users_json = json.load(json_file) 
     users = []
     for user in users_json:
-        user_instance = User(
-            user_id=user['id'],
-            name=user['name'],
-            real_name=user['profile']['real_name'],
-            email=user['profile']['email'],
-            is_bot=user['is_bot'],
-            avatar=user['profile']['image_192']
-        )
-        users.append(user_instance)
+        user_data = {
+            'user_id': user['id'],
+            'name': user['name'],
+            'real_name': user['profile']['real_name'],
+            'email': user['profile']['email'],
+            'is_bot': user['is_bot'],
+            'avatar': user['profile']['image_192']
+        }
+        users.append(user_data)
 
-    # TODO: should update the users if they already exist
-    User.bulk_create(users)
+    with db.atomic():
+        # User.bulk_create(users, batch_size=100)
+        for batch in chunked(users, 100):
+            User.insert_many(batch).on_conflict_replace().execute()
 
 def save_channels_data(channel_ids: [str]) -> [dict]:
     """reads channels' relevant info from channels.json and save it to Sqlite db
@@ -53,20 +57,20 @@ def save_channels_data(channel_ids: [str]) -> [dict]:
             if channel['id'] not in channel_ids:
                 continue
 
-            channel_instance = Channel(
-                channel_id=channel['id'],
-                name=channel['name'],
-                access=access,
-                purpose=channel['purpose']['value']
-            )
-            channels.append(channel_instance)
+            channel_data = {
+                'channel_id': channel['id'],
+                'name': channel['name'],
+                'access': access,
+                'purpose': channel['purpose']['value']
+            }
+            channels.append(channel_data)
             
-            channel_member_instance = ChannelMember(
-                channel_id=channel['id'],
-                user_ids=json.dumps( channel['members'] ),
-                no_members=len( channel['members'] )
-            )
-            channel_members.append(channel_member_instance)
+            for member_user_id in channel['members']:
+                channel_member =  {
+                    'channel_id': channel['id'],
+                    'user_id': member_user_id
+                }
+                channel_members.append(channel_member)
 
             saved_channels.append({
                 'id': channel['id'],
@@ -74,24 +78,18 @@ def save_channels_data(channel_ids: [str]) -> [dict]:
                 'access': access
             })
 
-        # TODO: should update the channels if they already exist
-        Channel.bulk_create(channels)
-        ChannelMember.bulk_create(channel_members)
+        with db.atomic():
+            for batch in chunked(channels, 100):
+                Channel.insert_many(batch).on_conflict_replace().execute()
+
+            for batch in chunked(channel_members, 100):
+                ChannelMember.insert_many(batch).on_conflict_replace().execute()
 
     return saved_channels
 
 
-def save_channel_messages(collection, saved_channels: [dict], channel_specs: [dict]):
+def save_channel_messages(collection, saved_channels: [dict], channel_specs: [dict]) -> None:
     """ Reads messages from a single channel file and saves the relevant info to Sqlite and Chroma.
-
-    Parameters
-    ----------
-    channel_id : str
-        the channel id of the channel where the messages belong
-    Returns
-    -------
-    [str]
-        extracted list of message ids from a single channel file
     """
     # Create a Message table if it doesn't exist
     Message.create_table()
@@ -109,8 +107,8 @@ def save_channel_messages(collection, saved_channels: [dict], channel_specs: [di
             start_date = datetime.utcfromtimestamp(0).date()
             end_date = datetime.now().date()
         else:
-            start_date = datetime.utcfromtimestamp(float(spec['start_date']) / 1000).date()
-            end_date = datetime.utcfromtimestamp(float(spec['end_date']) / 1000).date()
+            start_date = datetime.utcfromtimestamp(float(spec['start_date'])).date()
+            end_date = datetime.utcfromtimestamp(float(spec['end_date'])).date()
             if start_date >= end_date: 
                 print('Start date cannot be larger that end date!')
                 continue
@@ -141,21 +139,22 @@ def save_channel_messages(collection, saved_channels: [dict], channel_specs: [di
                 # Check if 'client_msg_id' and 'text' exists/aren't empty in the json file, or else return False
                 if not (message.get("client_msg_id", False) and message.get("text", False)): 
                     continue
-
+                
+                message_text = replace_slack_handles( message['text'] ) 
                 date_time = datetime.utcfromtimestamp( float(message['ts']) )
 
-                message_instance = Message(
-                    message_id=message['client_msg_id'],
-                    user_id=message['user'],
-                    channel_id=channel_id,
-                    text=message['text'],
-                    time=date_time
-                )
-                messages.append(message_instance)
+                message_data = {
+                    'message_id': message['client_msg_id'],
+                    'user_id': message['user'],
+                    'channel_id': channel_id,
+                    'text': message_text,
+                    'time': date_time
+                }
+                messages.append(message_data)
 
                 ids.append(message['client_msg_id'])
                 # Each message is embedded with the name of the user and the date / time
-                documents.append(f"({date_time.date()}) { message['user_profile']['real_name'] }: { message['text'] }")
+                documents.append(f"({date_time.date()}) { message['user_profile']['real_name'] }: { message_text }")
                 metadatas.append({
                     "user_id" : message['user'],
                     "channel_id" : channel_id,
@@ -163,13 +162,12 @@ def save_channel_messages(collection, saved_channels: [dict], channel_specs: [di
                     "source" : 'sl',
                 })
 
-            print(f"Saving channel \"{ channel['name'] }\" ...", end=' ')
-            # TODO: should update the messages if they already exist
+            print(f'Saving channel "{ channel["name"] }" ...', end=' ')
             if messages:
-                # Use insert_many with replace=True to insert new messages and update existing ones
-                # with db.atomic():
-                #     Message.insert_many(messages).on_conflict_replace().execute()
-                Message.bulk_create(messages)
+                # Use insert_many with on_conflict_replace() to insert new messages and update existing ones
+                with db.atomic():
+                    for batch in chunked(messages, 100):
+                        Message.insert_many(batch).on_conflict_replace().execute()
 
                 # Upsert messages to chroma
                 collection.upsert(
@@ -180,3 +178,23 @@ def save_channel_messages(collection, saved_channels: [dict], channel_specs: [di
                 print('Done!')
             else: print('The channel is empty!')
 
+# Hello <@user_id> -->  Hello user_name
+def replace_slack_handles(message: str) -> str:
+    # Define a regular expression pattern to match <@ ... >
+    pattern = r'<@(\w+)>'   # r"\<@([a-zA-Z0-9]+)\>"
+
+    def replace_match(match):
+        # Extract the user_id from the matched pattern
+        user_id = match.group(1)
+        # Lookup the user_id from the slack database and use the real_name, username or the original pattern
+        try:
+            user = User.select().where( User.user_id==user_id ).dicts().get()
+            replacement = user['real_name'] or user['name'] or f'<@{user_id}>'
+        except: 
+            replacement = f'<@{user_id}>'
+        # Use the user_id to look up the replacement in the dictionary; if not found, use the original pattern
+        return replacement
+
+    # Use re.sub to search for the pattern and replace it with the result of the replace_match function
+    output_string = re.sub(pattern, replace_match, message)
+    return output_string

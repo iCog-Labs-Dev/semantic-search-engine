@@ -1,14 +1,14 @@
+import os, requests, json
+from semantic_search_engine.constants import MM_PAT_ID_SHELVE
+from dotenv import load_dotenv
 
-from semantic_search_engine.constants import MM_USER_NAME, MM_PASSWORD, MM_PAT_SHELVE, MM_API_URL_SHELVE
-import requests
-import shelve
+load_dotenv()
 
 class MattermostAPI:
 
-    def __init__(self):
-        with shelve.open( MM_API_URL_SHELVE ) as mm_api_url_db:
-            # if mm_api_url_db.get( MM_API_URL_SHELVE, False ):
-            self.mm_api_url = mm_api_url_db[MM_API_URL_SHELVE]
+    def __init__(self, access_token: str):
+        self.mm_api_url = os.getenv("MM_API_URL")
+        self.access_token = access_token
     
     def get_user_channels(self, user_id: str, *args: [str]) -> [str]:
         """get the channel_ids for all the channels a user is a member of
@@ -23,16 +23,15 @@ class MattermostAPI:
         [str]
             the list of channel ids
         """
-        user_teams = self.mm_api_GET("/users/" + user_id + "/teams")
+        user_teams = self.mm_api_request("/users/" + user_id + "/teams")
         all_channels = []
 
         for team in user_teams:
-            channels_in_team = self.mm_api_GET(f"/users/{user_id}/teams/{team['id']}/channels")
+            channels_in_team = self.mm_api_request(f"/users/{user_id}/teams/{team['id']}/channels")
             all_channels.extend(channels_in_team)
 
         all_channels = list({v['id']:v for v in all_channels}.values()) # make the channels list unique
-
-        print('Total no. of channels: ', len(all_channels))
+        # print('Total no. of channels: ', len(all_channels))
         
         return [ch['id'] for ch in all_channels]
 
@@ -53,7 +52,7 @@ class MattermostAPI:
         {"field": "value"}
             _description_
         """
-        details = self.mm_api_GET(f"/{entity}/{mm_id}")
+        details = self.mm_api_request(f"/{entity}/{mm_id}")
 
         filtered_details = {}
 
@@ -85,55 +84,26 @@ class MattermostAPI:
     def get_post_details(self, post_id: str, *args: [str]):
         return self.get_details('posts', post_id, args)
 
-    # authenticate a user (through the MM API)
-    def __get_auth_token(self):
-        with shelve.open( MM_PAT_SHELVE ) as mm_personal_access_token:
-            if mm_personal_access_token.get( MM_PAT_SHELVE, False ):
-                return mm_personal_access_token[MM_PAT_SHELVE]
-            else:
-                print('Warning: You\'re not using a Personal Access Token, your session might expire!')
-                return requests.post(
-                    self.mm_api_url + "/users/login",
-                    json={ "login_id": MM_USER_NAME,
-                            "password": MM_PASSWORD },
-                    headers={ "Content-type": "application/json; charset=UTF-8" },
-                ).headers["token"]
 
-    def mm_api_GET(self, route: str, params={}):
-        authHeader = "Bearer " + self.__get_auth_token()
+    def mm_api_request(self, route: str, params: dict={}, method: str='GET', data: dict={}):
+        authHeader = "Bearer " + self.access_token # authenticate a user (through the MM API)
 
-        res = requests.get(
-            self.mm_api_url + route,
-            params=params,
-            headers={
-                "Content-type": "application/json; charset=UTF-8",
-                "Authorization": authHeader,
-            },
-        )
+        try:
+            res = requests.request(
+                method=method,
+                url=self.mm_api_url + route,
+                params=params,
+                data=json.dumps(data),
+                headers={
+                    "Content-type": "application/json; charset=UTF-8",
+                    "Authorization": authHeader,
+                },
+            )
+        except Exception as err:
+            raise Exception(f"Request to Mattermost's API failed: ", err)
         
         # Guard against bad requests
         if res.status_code != requests.codes.ok:
             raise Exception(f"Request to '{route}' failed with status code: ", res.status_code)
             
         return res.json()
-
-
-
-"""
-    # user_id -> realname 
-    # message_id -> time sent
-    # channel_id -> channel name
-
-Mattermost().get_user_details('ioff979djbn97juwtkx9cizq9e', 'first_name', 'last_name', 'username', 'email')             # Admin
-Mattermost().get_user_details('r3dhbuhw9f8gjpwyexd7ex4iuy', 'first_name', 'last_name', 'username', 'email', 'is_bot')   # Feedback-bot
-
-Mattermost().get_channel_details('9wgspwmu53y6mg1s6dpsbjzagy', 'name', 'display_name', 'type', 'team_id')   # hyperon           (public)
-Mattermost().get_channel_details('z4kqay9m1jdxipatytm7eyteur', 'name', 'display_name', 'type', 'team_id')   # icog-hyperon-team (private)
-
-Mattermost().get_post_details('u95bn1e1kiyg8d98hor7rwupwh', 'message', 'type', 'channel_id', 'user_id')     # Hello
-Mattermost().get_post_details('e68a8f4gsjya7g4isfujyej1fe', 'message', 'type', 'channel_id', 'user_id')     # Channel join
-
-print( Mattermost().get_user_channels('ioff979djbn97juwtkx9cizq9e', 'id', 'type', 'name') )
-
-Mattermost().get_all_channels('id', 'name', 'total_msg_count')
-"""

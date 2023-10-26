@@ -29,3 +29,9 @@ __set_default_shelve(
     shelve_name=CHROMA_N_RESULTS_SHELVE,
     default_value=DEFAULT_CHROMA_N_RESULTS 
 )
+
+# Default personal_access_token_id
+__set_default_shelve(
+    shelve_name=MM_PAT_ID_SHELVE,
+    default_value='' 
+)
