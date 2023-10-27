@@ -1,10 +1,9 @@
 import sys
-import time
 sys.path.append('./src')
 import os, requests, threading, shelve
 
 from json import dumps as to_json
-from time import sleep
+from time import time, sleep
 from flask import Flask, request, Response, send_file
 from flask_cors import CORS
 from functools import wraps
@@ -39,6 +38,12 @@ semantic_client = SemanticSearch()
 collection = semantic_client.collection
 mattermost = Mattermost(collection)
 slack = Slack(collection)
+slack_filter = {}
+
+prev_in_progress = False
+prev_is_syncing = False
+prev_sync_progress = 0
+timeout = 60 #* 10 # The timeout to break the SSE event loop
 
 # ************************************************************** /
 def login_required(admin_only: bool):
@@ -87,11 +92,11 @@ def login_required(admin_only: bool):
 
 
 
-# ************************************************************** /img
+# ************************************************************** /ping
 
-@app.route('/img', methods=['GET'])
-def ping_img():
-    return send_file('./src/img/user.webp', mimetype='image/webp')
+@app.route('/ping', methods=['HEAD'])
+def ping():
+    return ''
 
 # ************************************************************** /
 
@@ -110,13 +115,14 @@ def root_route(loggedin_user):
             res['chroma_n_results'] =  chroma_n_results_db[CHROMA_N_RESULTS_SHELVE]
             
         res['is_syncing'] = mattermost.is_syncing()
+        res['in_progress'] = mattermost.sync_in_progress
 
         return Response(to_json(res), status=200, mimetype='application/json')
     
     except:
         return Response(to_json({
             'message': 'Something went wrong! Please restart the server.',
-            'log': sys.exc_info()[0]
+            'log': str( sys.exc_info()[0] )
             }), status=500, mimetype='application/json')
 
 
@@ -148,13 +154,13 @@ def semantic_search(loggedin_user):
         except:
             return Response(to_json({
                 'message': 'Something went wrong, please try again!',
-                'log': sys.exc_info()[0]
+                'log': str( sys.exc_info()[0] )
             }), status=500, mimetype='application/json')
 
     
 # ************************************************************** /start_sync
     
-@app.route('/start_sync', methods=['GET'])
+@app.route('/start_sync')#, methods=['GET'])
 @login_required(admin_only=True)
 def start_sync(loggedin_user):
     access_token = loggedin_user['auth_token']
@@ -166,11 +172,13 @@ def start_sync(loggedin_user):
         return Response(to_json({
             'is_syncing': mattermost.is_syncing()
         }), status=200, mimetype='application/json')
+        # print('starting sync...')
+        # return Response(mattermost.start_sync(access_token), content_type='text/event-stream')
     
     except: 
         return Response(to_json({
             'message': 'Something went wrong while attempting to sync!',
-            'log': sys.exc_info()[0]
+            'log': str( sys.exc_info()[0] )
         }), status=500, mimetype='application/json')
 
 
@@ -189,7 +197,7 @@ def stop_sync(loggedin_user):
     except:
         return Response(to_json({
             'message': 'Something went wrong while stopping the sync!',
-            'log': sys.exc_info()[0]
+            'log': str( sys.exc_info()[0] )
         }), status=500, mimetype='application/json')
 
 # ************************************************************** /upload_slack_zip
@@ -215,61 +223,119 @@ def save_slack_zip(loggedin_user):
             channel_details = slack.upload_slack_data_zip(file_path)    # Extract it and read the channel details
             os.remove(file_path)                                        # Delete the zip file
 
-            return Response(to_json(channel_details), status=201, mimetype='application/json')
+            return Response(to_json(channel_details), status=200, mimetype='application/json')
         
         except:
             return Response(to_json({
                 'message': 'Something went wrong while uploading the file!',
-                'log': sys.exc_info()[0]
+                'log': str( sys.exc_info()[0] )
             }), status=500, mimetype='application/json')
 
 # ************************************************************** /store_slack_data
-# @app.route('/time')
-# def time_stream():
-#     def generate_time():
-#         while True:
-#             yield f"data: {time.strftime('%H:%M:%S')}\n\n"
-#             time.sleep(1)
-#     return Response(generate_time(), content_type='text/event-stream')
 
 @app.route('/store_slack_data', methods= ['GET', 'POST'])
-# @login_required(admin_only=True)
-def store_data():
-    # if request.method == 'GET':
-    #     return '''<pre><h4> Send a POST request: <br>
-    # {   
-    #     "channel_id" : {
-    #         "store_all" : true | false,
-    #         "store_none" : true | false,
-    #         "start_date" : (start date in POSIX time),
-    #         "end_date" : (end date in POSIX time)
-    #     },
-    #     ...
-    # } </h4></pre>'''
+@login_required(admin_only=True)
+def store_data(loggedin_user):
+    if request.method == 'GET':
+        return '''<pre><h4> Send a POST request: <br>
+    {   
+        "channel_id" : {
+            "store_all" : true | false,
+            "store_none" : true | false,
+            "start_date" : (start date in POSIX time),
+            "end_date" : (end date in POSIX time)
+        },
+        ...
+    } </h4></pre>'''
 
-    # elif request.method == 'POST':
-    if True:
+    elif request.method == 'POST':
+    # if True:
         try:
-            # channel_specs = request.get_json()
-            channel_specs = {'C05D1SE01B7': {'store_all': True, 'store_none': False, 'start_date': 1687165577, 'end_date': 1697805748.681}, 'C05D77W3N76': {'store_all': True, 'store_none': False, 'start_date': 1687165577, 'end_date': 1697805748.681}, 'C05D7863DRA': {'store_all': True, 'store_none': False, 'start_date': 1687165686, 'end_date': 1697805748.681}, 'C05ABCDE01': {'store_all': True, 'store_none': False, 'start_date': 1687166738, 'end_date': 1697805748.681}}
+            channel_specs = request.get_json()
+            global slack_filter
+            slack_filter = channel_specs
+
+            # channel_specs = {'C05D1SE01B7': {'store_all': True, 'store_none': False, 'start_date': 1687165577, 'end_date': 1697805748.681}, 'C05D77W3N76': {'store_all': True, 'store_none': False, 'start_date': 1687165577, 'end_date': 1697805748.681}, 'C05D7863DRA': {'store_all': True, 'store_none': False, 'start_date': 1687165686, 'end_date': 1697805748.681}, 'C05ABCDE01': {'store_all': True, 'store_none': False, 'start_date': 1687166738, 'end_date': 1697805748.681}}
             # slack.store_slack_data(channel_specs=channel_specs)
-            #TODO: should return progress in real-time (channel by channel)
 
-            # def generate_time():
-            #     while True:
-            #         yield f"data: {time.strftime('%H:%M:%S')}\n\n"
-            #         time.sleep(1)
-            # return Response(slack.test_yield(), content_type='text/event-stream')
-
-            # return Response(to_json( 'Slack data stored!' ), status=201, mimetype='application/json')
-            return Response(slack.store_slack_data(channel_specs=channel_specs), content_type='text/event-stream')
+            return Response(to_json( 'Filters saved!' ), status=200, mimetype='application/json')
+            # return Response(slack.store_slack_data(channel_specs=channel_specs), content_type='text/event-stream')
         
         except:
              return Response(to_json({
                 'message': 'Something went wrong while saving the data!',
-                'log': sys.exc_info()[0]
+                'log': str( sys.exc_info()[0] )
             }), status=500, mimetype='application/json')
 
+@app.route('/store_slack_data_stream')
+@login_required(admin_only=True)
+def store_slack_data_stream(loggedin_user):
+    try:
+        # channel_specs = request.get_json()
+        # channel_specs = {'C05D1SE01B7': {'store_all': True, 'store_none': False, 'start_date': 1687165577, 'end_date': 1697805748.681}, 'C05D77W3N76': {'store_all': True, 'store_none': False, 'start_date': 1687165577, 'end_date': 1697805748.681}, 'C05D7863DRA': {'store_all': True, 'store_none': False, 'start_date': 1687165686, 'end_date': 1697805748.681}, 'C05ABCDE01': {'store_all': True, 'store_none': False, 'start_date': 1687166738, 'end_date': 1697805748.681}}
+        # slack.store_slack_data(channel_specs=channel_specs)
+        #TODO: should return progress in real-time (channel by channel)
+        global slack_filter
+
+        # return Response(to_json( 'Slack data stored!' ), status=201, mimetype='application/json')
+        return Response(slack.store_slack_data(channel_specs=slack_filter), content_type='text/event-stream')
+    
+    except:
+            return Response(to_json({
+            'message': 'Something went wrong while saving the data!',
+            'log': str( sys.exc_info()[0] )
+        }), status=500, mimetype='application/json')
+
+
+@app.route('/sync_in_progress')
+@login_required(admin_only=True)
+def sync_in_progress(loggedin_user):
+    def in_progress():
+        start_time = time()
+        while True:
+            # yield f"data: {time.strftime('%H:%M:%S')}\n\n"
+            global prev_in_progress
+            if mattermost.sync_in_progress != prev_in_progress:
+                prev_in_progress = mattermost.sync_in_progress
+                yield f"data: prog{ mattermost.sync_in_progress }\n\n"
+            elif time() > start_time + timeout:
+                break
+            
+            sleep(1)
+    return Response(in_progress(), content_type='text/event-stream')
+
+@app.route('/is_sync_started')
+@login_required(admin_only=True)
+def is_sync_started(loggedin_user):
+    def is_started():
+        start_time = time()
+        while True:
+            # yield f"data: {time.strftime('%H:%M:%S')}\n\n"
+            global prev_is_syncing
+            if mattermost.is_syncing() != prev_is_syncing:
+                prev_is_syncing = mattermost.is_syncing()
+                yield f"data: sync{ mattermost.is_syncing() }\n\n"
+            elif time() > start_time + timeout:
+                break
+
+            sleep(3)
+    return Response(is_started(), content_type='text/event-stream')
+
+@app.route('/get_sync_progress')
+@login_required(admin_only=True)
+def get_sync_progress(loggedin_user):
+    def sync_progress():
+        start_time = time()
+        while True:
+            global prev_sync_progress
+            if mattermost.sync_percentage != prev_sync_progress:
+                prev_sync_progress = mattermost.sync_percentage
+                yield f"data: percent{ mattermost.sync_percentage }\n\n"
+            elif time() > start_time + timeout:
+                break
+            
+            sleep(1)
+    return Response(sync_progress(), content_type='text/event-stream')
 # ************************************************************** /reset
 
 @app.route('/reset', methods=['GET', 'POST'])
@@ -297,7 +363,7 @@ def reset_all(loggedin_user):
         except:
             return Response(to_json({
                 'message': 'Something went wrong while resetting!',
-                'log': sys.exc_info()[0]
+                'log': str( sys.exc_info()[0] )
             }), status=500, mimetype='application/json')
     
 
@@ -318,8 +384,8 @@ def set_fetch_interval(loggedin_user):
 
             if body.get('fetch_interval', False): 
                 fetch_interval = abs (float( body['fetch_interval'] ))
-                if fetch_interval < (15 * 60) or fetch_interval > (24 * 60 * 60):
-                    return Response(to_json({ 'message': 'Fetch interval must be between 15 minutes and 24 hours!' }), status=400, mimetype='application/json')
+                if fetch_interval < 60 or fetch_interval > (24 * 60 * 60):
+                    return Response(to_json({ 'message': 'Fetch interval must be between 1 minute and 24 hours!' }), status=400, mimetype='application/json')
                 
                 with shelve.open( FETCH_INTERVAL_SHELVE ) as fetch_interval_db:
                     fetch_interval_db[FETCH_INTERVAL_SHELVE] = fetch_interval
@@ -334,7 +400,7 @@ def set_fetch_interval(loggedin_user):
         except:
             return Response(to_json({
                 'message': 'Something went wrong while setting the fetch interval!',
-                'log': sys.exc_info()[0]
+                'log': str( sys.exc_info()[0] )
             }), status=500, mimetype='application/json')
 
 # ************************************************************** /set_chroma_n_results
@@ -366,7 +432,7 @@ def set_chroma_n_results(loggedin_user):
         except:
             return Response(to_json({
                 'message': 'Something went wrong while setting Chroma n_results!',
-                'log': sys.exc_info()[0]
+                'log': str( sys.exc_info()[0] )
             }), status=500, mimetype='application/json')
 
 
