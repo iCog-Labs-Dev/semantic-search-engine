@@ -86,11 +86,11 @@ def login_required(admin_only: bool):
 
 
 
-# ************************************************************** /img
+# ************************************************************** /ping
 
-@app.route('/img', methods=['GET'])
-def ping_img():
-    return send_file('./src/img/user.webp', mimetype='image/webp')
+@app.route('/ping', methods=['HEAD'])
+def ping():
+    return ''
 
 # ************************************************************** /
 
