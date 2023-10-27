@@ -67,8 +67,8 @@ class Slack:
     
     def test_yield(self):
          while True:
-            yield f"data: { 'hello' }\n\n"
-            # yield f"data: {time.strftime('%H:%M:%S')}\n\n"
+            # yield f"data: { 'hello' }\n\n"
+            yield f"data: {time.strftime('%H:%M:%S')}\n\n"
             time.sleep(1)
 
     def store_slack_data(self, channel_specs: dict) -> None:
@@ -79,7 +79,6 @@ class Slack:
             a dict containing the channel_ids along with the start and end dates
             it also contains store_all and store_none boolean values
         """
-        yield f"data: { 'hellooo' }\n\n"
         # Get users data from the extracted file path and save to db
         save_users_data()
 
@@ -91,17 +90,13 @@ class Slack:
             channel_ids=channel_ids
         )
 
-        yield f"data: { '2143hellooo' }\n\n"
-
         # Get messages for each channel from the extracted file path and save to db
+        # yield will respond with channel progress in real time 
         yield from save_channel_messages(
             collection=self.collection,
             saved_channels=saved_channels,
             channel_specs=channel_specs
-        )
-
-        # TODO: respond with channel progress in real time 
-        # yield 'something'   
+        ) 
 
     @staticmethod
     def get_channel_details(channel_id: str):

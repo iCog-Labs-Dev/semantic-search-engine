@@ -1,5 +1,6 @@
 import os, json, re
 from datetime import datetime
+import time
 
 from flask import Response
 from semantic_search_engine.slack.models import User, Channel, ChannelMember, Message
@@ -118,7 +119,9 @@ def save_channel_messages(collection, saved_channels: [dict], channel_specs: [di
 
         # Get all files in the channel's folder (each file correspond to daily messages)
         all_files = os.listdir(channel_folder)
-        for file_name in all_files:
+        no_files = len(all_files)
+
+        for idx, file_name in enumerate(all_files):
 
             # Get the date from the filename and check whether it's in the range provided
             date_str = file_name.split('.json')[0]  # The files are stored as YYYY-mm-dd.json
@@ -181,9 +184,8 @@ def save_channel_messages(collection, saved_channels: [dict], channel_specs: [di
                 print('Done!')
             else: print('The channel is empty!')
 
-            # yield 'Channel'
-            # yield Response(json.dumps( 'Slack data stored!' ), status=201, mimetype='application/json')
-            yield f"data: { 'Done and done!' }\n\n"
+            yield f'data: { json.dumps({ channel_id: (idx+1)/ no_files }) }\n\n'
+
 
 # Hello <@user_id> -->  Hello user_name
 def replace_slack_handles(message: str) -> str:
