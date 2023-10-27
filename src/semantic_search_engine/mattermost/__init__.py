@@ -3,9 +3,9 @@ import os
 from semantic_search_engine.constants import *
 
 def __set_default_shelve(shelve_name: str, default_value):
-    with shelve.open( shelve_name ) as fetch_interval:
-        if not fetch_interval.get( shelve_name, False ):
-            fetch_interval[ shelve_name ] = default_value
+    with shelve.open( shelve_name ) as my_shelve:
+        if not my_shelve.get( shelve_name, False ):
+            my_shelve[ shelve_name ] = default_value
 
 # Create the shelve directory if it doesn't exist
 os.makedirs(SHELVE_PATH, exist_ok=True)
@@ -22,6 +22,12 @@ __set_default_shelve(
 __set_default_shelve(
     shelve_name=LAST_FETCH_TIME_SHELVE,
     default_value=DEFAULT_LAST_FETCH_TIME 
+)
+
+# Default total_posts
+__set_default_shelve(
+    shelve_name=TOTAL_POSTS_SHELVE,
+    default_value=DEFAULT_TOTAL_POSTS
 )
 
 # Default fetch_interval
