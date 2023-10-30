@@ -24,8 +24,8 @@ DEFAULT_FETCH_INTERVAL = 15 * 60    # fetch interval in minutes
 DEFAULT_LAST_FETCH_TIME = 0
 DEFAULT_TOTAL_POSTS = 0
 # Default Chroma Settings
-DEFAULT_CHROMA_N_RESULTS = 25
-DEFAULT_MAX_CHROMA_DISTANCE = 0.6
+DEFAULT_CHROMA_N_RESULTS = ('chroma_n_results', 25)
+DEFAULT_MAX_CHROMA_DISTANCE = ('max_chroma_distance', 0.6)
 # Default LLM Settings
 DEFAULT_LLM_TEMPERATURE = 2
 DEFAULT_LLM_MAX_TOKENS = 1024
@@ -37,4 +37,4 @@ LAST_FETCH_TIME_SHELVE = os.path.join(SHELVE_PATH, "last_fetch_time")
 FETCH_INTERVAL_SHELVE = os.path.join(SHELVE_PATH, "fetch_interval")
 TOTAL_POSTS_SHELVE = os.path.join(SHELVE_PATH, "total_posts")
 MM_PAT_ID_SHELVE = os.path.join(SHELVE_PATH, "personal_access_token_id")
-CHROMA_N_RESULTS_SHELVE = os.path.join(SHELVE_PATH, "chroma_n_results")
+CHROMA_SHELVE = os.path.join(SHELVE_PATH, "chroma_shelve")
