@@ -1,6 +1,9 @@
 import shelve
 import os
 from semantic_search_engine.constants import *
+from semantic_search_engine.chroma import ChromaSingleton
+
+collection = ChromaSingleton().get_chroma_collection()
 
 def __set_default_shelve(shelve_name: str, default_value):
     with shelve.open( shelve_name ) as my_shelve:
@@ -28,12 +31,6 @@ __set_default_shelve(
 __set_default_shelve(
     shelve_name=TOTAL_POSTS_SHELVE,
     default_value=DEFAULT_TOTAL_POSTS
-)
-
-# Default fetch_interval
-__set_default_shelve(
-    shelve_name=CHROMA_N_RESULTS_SHELVE,
-    default_value=DEFAULT_CHROMA_N_RESULTS 
 )
 
 # Default personal_access_token_id

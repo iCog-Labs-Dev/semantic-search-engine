@@ -1,15 +1,11 @@
 import os, json
-import time
 from zipfile import ZipFile
 from semantic_search_engine.slack.save import save_channel_messages, save_channels_data, save_users_data
 from semantic_search_engine.slack.models import User, Channel, ChannelMember, Message
 from semantic_search_engine.constants import TEMP_SLACK_DATA_PATH
-from . import db
+from . import db, collection
 
 class Slack:
-
-    def __init__(self, collection) -> None:
-        self.collection = collection
 
     def reset_slack(self) -> None:
         """ deletes all slack data from SQLite and Chroma
@@ -21,7 +17,7 @@ class Slack:
         ChannelMember.delete().execute()
 
         # Delete all Chroma entries for Slack
-        self.collection.delete(
+        collection.delete(
             where={"source" : "sl"}
         )
 
@@ -64,12 +60,6 @@ class Slack:
                     'purpose': channel['purpose']['value']
                 })
         return channel_details
-    
-    def test_yield(self):
-         while True:
-            # yield f"data: { 'hello' }\n\n"
-            yield f"data: {time.strftime('%H:%M:%S')}\n\n"
-            time.sleep(1)
 
     def store_slack_data(self, channel_specs: dict) -> None:
         """ loads the extracted file from directory and saves everything to Sqlite and Chroma
@@ -93,7 +83,7 @@ class Slack:
         # Get messages for each channel from the extracted file path and save to db
         # yield will respond with channel progress in real time 
         yield from save_channel_messages(
-            collection=self.collection,
+            collection=collection,
             saved_channels=saved_channels,
             channel_specs=channel_specs
         ) 

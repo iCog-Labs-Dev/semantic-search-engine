@@ -2,15 +2,15 @@ import shelve
 from time import time, sleep
 from sched import scheduler
 from json import dumps as to_json
+from datetime import datetime
 
 from semantic_search_engine.constants import DEFAULT_LAST_FETCH_TIME, DEFAULT_TOTAL_POSTS, FETCH_INTERVAL_SHELVE, LAST_FETCH_TIME_SHELVE, MM_PAT_ID_SHELVE, TOTAL_POSTS_SHELVE
 from semantic_search_engine.mattermost.mm_api import MattermostAPI as MMApi
-from datetime import datetime
+from . import collection
 
 class Mattermost:
 
-    def __init__(self, collection) -> None:
-        self.collection = collection
+    def __init__(self) -> None:
 
         with shelve.open(FETCH_INTERVAL_SHELVE) as fetch_interval:
             self.fetch_interval_in_seconds = int(fetch_interval[FETCH_INTERVAL_SHELVE])
@@ -130,7 +130,7 @@ class Mattermost:
                     print('POST ************** ', post)
                     if post['delete_at'] > 0:
                         total_posts-=1    # Deleted messages don't decrease the total_message_count from the API
-                        self.collection.delete(ids=[post['id']])    # If the post has been deleted, also delete the message from Chroma
+                        collection.delete(ids=[post['id']])    # If the post has been deleted, also delete the message from Chroma
                         print('Message deleted!')
                     # Filter out any channel join and other type messages. Also filter out any empty string messages (only images, audio, ...)
                     elif (post['type']=='' and post['message']): # If the 'type' is empty, that means it's a normal message (instead of 'system_join_channel')
@@ -157,7 +157,7 @@ class Mattermost:
                         }
                     '''
 
-                    self.collection.upsert(
+                    collection.upsert(
                         ids=[post['id'] for post in filtered_posts],
                         documents=[post['message'] for post in filtered_posts],
                         metadatas=[{**{'user_id': x}, 
@@ -293,7 +293,7 @@ class Mattermost:
     def reset_mattermost(self):
         self.stop_sync()
         try:
-            self.collection.delete(
+            collection.delete(
                 where={"source" : "mm"}
             )
 
