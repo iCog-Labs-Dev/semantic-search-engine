@@ -3,13 +3,14 @@ from time import sleep, time
 from flask import Blueprint, Response
 from json import dumps as to_json
 from . import mattermost
+from semantic_search_engine.mattermost.fetch_mm_data import get_sync_percentage, is_sync_inprogress
 from routes.login_decorator import login_required
 
 sync_bp = Blueprint('sync', __name__)
 
 
-prev_in_progress = False
 prev_is_syncing = False
+prev_in_progress = False
 prev_sync_progress = 0
 timeout = 60 #* 10 # The timeout to break the SSE event loop
    
@@ -55,25 +56,27 @@ def stop_sync(loggedin_user):
             'log': str( err )
         }), status=500, mimetype='application/json')
 
-# ************************************************************** stream (SSE)
+# ************************************************************** Stream progress in real-time (SSE) **************************************************************
 
-@sync_bp.route('/in_progress')
+# ************************************************************** /is_inprogress
+@sync_bp.route('/is_inprogress')
 @login_required(admin_only=True)
 def sync_in_progress(loggedin_user):
     def in_progress():
         start_time = time()
         while True:
-            # yield f"data: {time.strftime('%H:%M:%S')}\n\n"
+            sync_in_progress = is_sync_inprogress()
             global prev_in_progress
-            if mattermost.sync_in_progress != prev_in_progress:
-                prev_in_progress = mattermost.sync_in_progress
-                yield f"data: prog{ mattermost.sync_in_progress }\n\n"
+            if sync_in_progress != prev_in_progress:
+                prev_in_progress = sync_in_progress
+                yield f"data: prog{ sync_in_progress }\n\n"
             elif time() > start_time + timeout:
                 break
             
             sleep(1)
     return Response(in_progress(), content_type='text/event-stream')
 
+# ************************************************************** /is_started
 @sync_bp.route('/is_started')
 @login_required(admin_only=True)
 def is_sync_started(loggedin_user):
@@ -91,16 +94,18 @@ def is_sync_started(loggedin_user):
             sleep(3)
     return Response(is_started(), content_type='text/event-stream')
 
-@sync_bp.route('/progress_stream')
+# ************************************************************** /sync_percentage
+@sync_bp.route('/sync_percentage')
 @login_required(admin_only=True)
 def get_sync_progress(loggedin_user):
     def sync_progress():
         start_time = time()
         while True:
+            sync_percentage = get_sync_percentage()
             global prev_sync_progress
-            if mattermost.sync_percentage != prev_sync_progress:
-                prev_sync_progress = mattermost.sync_percentage
-                yield f"data: percent{ mattermost.sync_percentage }\n\n"
+            if sync_percentage != prev_sync_progress:
+                prev_sync_progress = sync_percentage
+                yield f"data: percent{ sync_percentage }\n\n"
             elif time() > start_time + timeout:
                 break
             

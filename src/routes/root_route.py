@@ -3,6 +3,7 @@ from flask import Response, Blueprint
 from json import dumps as to_json
 from semantic_search_engine.constants import FETCH_INTERVAL_SHELVE, LAST_FETCH_TIME_SHELVE, CHROMA_SHELVE
 from routes.login_decorator import login_required
+from semantic_search_engine.mattermost.fetch_mm_data import is_sync_inprogress
 from . import mattermost
 
 root_bp = Blueprint("root", __name__)
@@ -31,7 +32,7 @@ def root_route(loggedin_user):
             res['max_chroma_distance'] =  chroma_n_results_db['max_chroma_distance']
             
         res['is_syncing'] = mattermost.is_syncing()
-        res['in_progress'] = mattermost.sync_in_progress
+        res['in_progress'] = is_sync_inprogress()
 
         return Response(to_json(res), status=200, mimetype='application/json')
     
