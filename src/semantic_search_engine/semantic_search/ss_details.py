@@ -1,6 +1,6 @@
 from datetime import datetime
 from semantic_search_engine.slack.slack import Slack as Sl
-from semantic_search_engine.mattermost.mm_api import MattermostAPI as MMApi
+from semantic_search_engine.mattermost.fetch_mm_data_details import FetchMMDetails
 
 from os import getenv
 from dotenv import load_dotenv
@@ -13,7 +13,7 @@ class SemanticSearchDetails:
 
         self.access_token = access_token
         # Initialze MMApi with the user's access_token
-        self.mm_api = MMApi(access_token=self.access_token)
+        self.mm_details = FetchMMDetails(access_token=self.access_token)
 
         self.user_id = user_info['user_id']
         self.user_email = user_info['email']
@@ -27,7 +27,7 @@ class SemanticSearchDetails:
             list of channel ids for Mattermost and Slack
         """
         # Get the channels list for the user from Mattermost's API
-        mm_channels_list = self.mm_api.get_user_channels( user_id=self.user_id )
+        mm_channels_list = self.mm_details.get_user_channels( user_id=self.user_id )
         # Get the channels list of Slack
         sl_channels_list = Sl.get_user_channels( user_email=self.user_email )
 
@@ -54,20 +54,20 @@ class SemanticSearchDetails:
             }
             if metadata['source']=='mm':
                 try:
-                    user_data = self.mm_api.get_user_details(
+                    user_data = self.mm_details.get_user_details(
                         metadata['user_id'],
                         'first_name', 'last_name', 'username'
                         )
-                    channel_data = self.mm_api.get_channel_details(
+                    channel_data = self.mm_details.get_channel_details(
                         metadata['channel_id'],
                         'name', 'display_name', 'team_id'
                         )
 
-                    post_data = self.mm_api.get_post_details(
+                    post_data = self.mm_details.get_post_details(
                         ids[idx],
                         'id', 'message', 'update_at' # create_at
                         )
-                    team_data = self.mm_api.get_team_details(
+                    team_data = self.mm_details.get_team_details(
                         channel_data['team_id'],
                         'name'
                     )

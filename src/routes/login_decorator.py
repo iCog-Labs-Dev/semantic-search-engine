@@ -1,5 +1,4 @@
 import os, requests
-from semantic_search_engine.mattermost.mm_api import MattermostAPI as MM_Api
 from functools import wraps
 from flask import request, Response
 from json import dumps as to_json
