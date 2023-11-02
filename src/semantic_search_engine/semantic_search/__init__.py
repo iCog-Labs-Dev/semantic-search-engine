@@ -3,6 +3,7 @@ from semantic_search_engine.together_llm import TogetherLLM
 from langchain import LLMChain, PromptTemplate
 from semantic_search_engine.chroma import ChromaSingleton
 from semantic_search_engine.constants import DEFAULT_CHROMA_N_RESULTS, DEFAULT_MAX_CHROMA_DISTANCE, CHROMA_SHELVE
+from semantic_search_engine.shelves import create_default_shelve
 
 prompt_template = PromptTemplate( input_variables=["context", "query", "user"], template="""\
 [INST]\n
@@ -46,11 +47,16 @@ collection = ChromaSingleton().get_chroma_collection()
 
 
 # Set default chroma_n_results && max_chroma_distance if they don't exist
-with shelve.open( CHROMA_SHELVE ) as chroma_shelve:
-    name, value = DEFAULT_MAX_CHROMA_DISTANCE
-    if not chroma_shelve.get( name, False ):
-        chroma_shelve[ name ] = value
+create_default_shelve(
+    shelve_name=CHROMA_SHELVE,
+    max_chroma_distance=DEFAULT_MAX_CHROMA_DISTANCE,
+    chroma_n_results=DEFAULT_CHROMA_N_RESULTS
+)
+# with shelve.open( CHROMA_SHELVE ) as chroma_shelve:
+#     name, value = DEFAULT_MAX_CHROMA_DISTANCE
+#     if not chroma_shelve.get( name, False ):
+#         chroma_shelve[ name ] = value
     
-    name, value = DEFAULT_CHROMA_N_RESULTS
-    if not chroma_shelve.get( name, False ):
-        chroma_shelve[ name ] = value
+#     name, value = DEFAULT_CHROMA_N_RESULTS
+#     if not chroma_shelve.get( name, False ):
+#         chroma_shelve[ name ] = value
