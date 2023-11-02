@@ -1,6 +1,6 @@
 import shelve
 import os
-from semantic_search_engine.constants import *
+from src.semantic_search_engine.constants import *
 
 def __set_default_shelve(shelve_name: str, default_value):
     with shelve.open( shelve_name ) as fetch_interval:

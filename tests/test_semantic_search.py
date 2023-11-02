@@ -2,8 +2,8 @@
 # import shutil
 # import unittest
 # from semantic_search_engine import constants
-# from semantic_search_engine.semantic_search import SemanticSearch
-# from semantic_search_engine.constants import TOGETHER_API_KEY
+# from src.semantic_search_engine.semantic_search import SemanticSearch
+# from src.semantic_search_engine.constants import TOGETHER_API_KEY
 # import together
 # import os
 

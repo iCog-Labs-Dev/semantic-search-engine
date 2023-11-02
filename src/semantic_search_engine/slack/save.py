@@ -1,7 +1,7 @@
 import os, json, re
 from datetime import datetime
-from semantic_search_engine.slack.models import User, Channel, ChannelMember, Message
-from semantic_search_engine.constants import TEMP_SLACK_DATA_PATH
+from src.semantic_search_engine.slack.models import User, Channel, ChannelMember, Message
+from src.semantic_search_engine.constants import TEMP_SLACK_DATA_PATH
 from peewee import chunked
 from . import db
 

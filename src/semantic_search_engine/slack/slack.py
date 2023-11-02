@@ -1,8 +1,8 @@
 import os, json
 from zipfile import ZipFile
-from semantic_search_engine.slack.save import save_channel_messages, save_channels_data, save_users_data
-from semantic_search_engine.slack.models import User, Channel, ChannelMember, Message
-from semantic_search_engine.constants import TEMP_SLACK_DATA_PATH
+from src.semantic_search_engine.slack.save import save_channel_messages, save_channels_data, save_users_data
+from src.semantic_search_engine.slack.models import User, Channel, ChannelMember, Message
+from src.semantic_search_engine.constants import TEMP_SLACK_DATA_PATH
 from . import db
 
 class Slack:

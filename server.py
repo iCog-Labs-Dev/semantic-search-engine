@@ -1,5 +1,5 @@
 import sys
-sys.path.append('./src')
+# sys.path.append('./src')
 import os, requests, threading, shelve
 
 from json import dumps as to_json
@@ -9,12 +9,12 @@ from flask_cors import CORS
 from functools import wraps
 # from flask_sse import sse
 
-from semantic_search_engine.semantic_search import SemanticSearch
-from semantic_search_engine.mattermost.mattermost import Mattermost
-from semantic_search_engine.mattermost.mm_api import MattermostAPI as MM_Api
-from semantic_search_engine.slack.slack import Slack
-from semantic_search_engine.slack.models import User, Channel, ChannelMember, Message
-from semantic_search_engine.constants import FETCH_INTERVAL_SHELVE, LAST_FETCH_TIME_SHELVE, CHROMA_N_RESULTS_SHELVE, TEMP_SLACK_DATA_PATH
+from src.semantic_search_engine.semantic_search import SemanticSearch
+from src.semantic_search_engine.mattermost.mattermost import Mattermost
+from src.semantic_search_engine.mattermost.mm_api import MattermostAPI as MM_Api
+from src.semantic_search_engine.slack.slack import Slack
+from src.semantic_search_engine.slack.models import User, Channel, ChannelMember, Message
+from src.semantic_search_engine.constants import FETCH_INTERVAL_SHELVE, LAST_FETCH_TIME_SHELVE, CHROMA_N_RESULTS_SHELVE, TEMP_SLACK_DATA_PATH
 
 from dotenv import load_dotenv
 load_dotenv()

@@ -3,7 +3,7 @@ import together
 from pydantic import Extra, root_validator #, Field
 from langchain.llms.base import LLM
 from langchain.utils import get_from_dict_or_env
-from semantic_search_engine.constants import TOGETHER_API_KEY, TOGETHER_MODEL_NAME
+from src.semantic_search_engine.constants import TOGETHER_API_KEY, TOGETHER_MODEL_NAME
 
 
 class TogetherLLM(LLM):
