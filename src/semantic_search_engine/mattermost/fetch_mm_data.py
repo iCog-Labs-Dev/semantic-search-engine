@@ -1,10 +1,12 @@
 import shelve
-from semantic_search_engine.constants import LAST_FETCH_TIME_SHELVE, TOTAL_POSTS_SHELVE, FETCH_INTERVAL_SHELVE
+from semantic_search_engine.constants import LAST_SYNC_TIME_SHELVE, TOTAL_POSTS_SHELVE, SYNC_INTERVAL_SHELVE
 from json import dumps as to_json
 from datetime import datetime
 from time import time, sleep
 from semantic_search_engine.mattermost.mm_api import MattermostAPI
 from semantic_search_engine.mattermost.fetch_mm_data_details import FetchMMDetails
+from semantic_search_engine.mattermost.mm_scheduler import MMScheduler
+from semantic_search_engine.shelves import retrieve_one, store
 from . import collection
 
 sync_in_progress = False
@@ -12,42 +14,92 @@ sync_percentage = 0
 
 class FetchMMData:
 
-    def __init__(self, access_token, next_fetch_scheduler) -> None:
+    def __init__(self, access_token, next_sync_scheduler) -> None:
         self.mm_api_request = MattermostAPI( access_token=access_token ).mm_api_request
         self.fetch_mm_details = FetchMMDetails( access_token=access_token )
+        self.next_sync_scheduler: MMScheduler = next_sync_scheduler
 
-        self.next_fetch_scheduler = next_fetch_scheduler
+        self.sync_interval_in_seconds = retrieve_one( shelve_name=SYNC_INTERVAL_SHELVE, key='sync_interval' )
+        # with shelve.open(SYNC_INTERVAL_SHELVE) as sync_interval:
+        #     self.sync_interval_in_seconds = int(sync_interval[SYNC_INTERVAL_SHELVE])
 
-        with shelve.open(FETCH_INTERVAL_SHELVE) as fetch_interval:
-            self.fetch_interval_in_seconds = int(fetch_interval[FETCH_INTERVAL_SHELVE])
+        self.last_sync_time = retrieve_one( shelve_name=LAST_SYNC_TIME_SHELVE, key='last_sync_time' )
+        # with shelve.open(LAST_SYNC_TIME_SHELVE) as last_sync_time:
+        #     self.last_sync_time = int(last_sync_time[LAST_SYNC_TIME_SHELVE])
 
-        with shelve.open(LAST_FETCH_TIME_SHELVE) as last_fetch_time:
-            self.last_fetch_time = int(last_fetch_time[LAST_FETCH_TIME_SHELVE])
-
-        with shelve.open(TOTAL_POSTS_SHELVE) as total_posts:
-            self.prev_total_posts = int(total_posts[TOTAL_POSTS_SHELVE])
+        self.prev_total_posts = retrieve_one( shelve_name=TOTAL_POSTS_SHELVE, key='total_posts' )
+        # with shelve.open(TOTAL_POSTS_SHELVE) as total_posts:
+        #     self.prev_total_posts = int(total_posts[TOTAL_POSTS_SHELVE])
 
     def get_all_channels(self,  *fields: [str]):
         all_channels = self.mm_api_request('/channels')
         channel_fields = [{field: res[field] for field in fields} for res in all_channels]
         return channel_fields
+    
+    def delete_and_filter_posts(self, posts):
+        # TODO: filter out any stickers / emojis
+        # TODO: replace user handles with their real names
+        filtered_posts = []
+        for post in posts:
+            # print('POST ************** ', post)
+            if post['delete_at'] > 0:
+                total_posts-=1    # Deleted messages don't decrease the total_message_count from the API
+                collection.delete(ids=[post['id']])    # If the post has been deleted, also delete the message from Chroma
+                print('Message deleted!')
+            # Filter out any channel join and other type messages. Also filter out any empty string messages (only images, audio, ...)
+            elif (post['type']=='' and post['message']): # If the 'type' is empty, that means it's a normal message (instead of 'system_join_channel')
+                user_details = self.fetch_mm_details.get_user_details(post['user_id'], 'first_name', 'last_name', 'username')
+                post['message'] = f"({ datetime.utcfromtimestamp(post['update_at'] / 1000).date() }) { user_details['name'] }: { post['message'] }"
+                filtered_posts.append(post)
 
-    def get_posts_for_all_channels(self):
+        return filtered_posts
+    
+    def upsert_channel_posts(self, posts, access, source='mm'):
+        if not posts:
+            print('No posts to add to Chroma!')
+            return
+        try:
+            user_ids=[post['user_id'] for post in posts]
+            channel_ids=[post['channel_id'] for post in posts]
+            '''
+                {
+                    "id" : "message_id",
+                    "document" : "(date) User: message_text",
+                    "metadata" : {
+                        "source": "mm",
+                        "access" : "pri / pub",
+                        "channel_id" : "ch_sdfsa",
+                        "user_id" : "usr_dfsdf",
+                    }
+                }
+            '''
+            collection.upsert(
+                ids=[post['id'] for post in posts],
+                documents=[post['message'] for post in posts],
+                metadatas=[{**{'user_id': x}, 
+                            **{'channel_id': y},
+                            "access": access,
+                            "source": source}  for x, y in zip(user_ids, channel_ids)]
+            )
+        except Exception as err:
+            raise(f'Error while upserting Mattermost messages: {str(err)} ')
+
+
+    def sync_latest_posts(self):
         print(f"\n {'*'*50} \n")
-        print('Fetching posts for all channels ...')
 
         global sync_in_progress
         sync_in_progress = True
 
-        # calculate the time passed since lastFetchTIme
-        time_passed_in_seconds = (time() - self.last_fetch_time)
+        # Calculate the time passed since last sync
+        time_passed_in_seconds = (time() - self.last_sync_time)
         print('Time passed since last fetch: ', time_passed_in_seconds)
 
         post_params = {}
 
-        # if time_passed_in_seconds >= self.fetch_interval_in_seconds and last_fetch_time != 0:
-        if self.last_fetch_time != 0 and self.prev_total_posts != 0:
-            post_params = { 'since': int(self.last_fetch_time * 1000) } # convert to milliseconds
+        # if time_passed_in_seconds >= self.sync_interval_in_seconds and last_sync_time != 0:
+        if self.last_sync_time != 0 and self.prev_total_posts != 0:
+            post_params = { 'since': int(self.last_sync_time * 1000) } # convert to milliseconds
         
         # Get all channels' data
         channels = self.get_all_channels('id', 'type', 'total_msg_count', 'display_name') 
@@ -91,23 +143,6 @@ class FetchMMData:
                 # Change the posts into a list of dictionaries with the above 'fields'
                 posts = [ { field: posts_res['posts'][postId][field] for field in fields } for postId in posts_res['order'] ]
 
-                ## Take threads into account (all posts in a thread will be embedded together)
-                # try:
-                # for postId in posts_res['order']:
-                #     thread_res = self.mm_api_request(
-                #         f"/posts/{postId}/thread"
-                #     )
-                #     thread = ''
-                #     for thread_post_id in thread_res['order']:
-                #         # '\n'.join( [thread_res['posts'][thread_post_id][field] for field in fields] )
-                #         thread_post = thread_res['posts'][thread_post_id]
-                #         post_user = self.get_user_details(thread_post['user_id'], 'first_name', 'last_name', 'username')
-                #         post_time = self.get_post_details(thread_post_id, 'time')
-                #         message = f"({ post_time['time'] }) { post_user['name'] }: { thread_post['user_id'] }"
-                #         thread += message + '\n'
-                #     print(thread)
-                # except: print('^'*60)
-
                 # Get the channel's access restriction (private / public)
                 access = ''
                 if channel["type"] == 'O':  access = 'pub'
@@ -140,70 +175,41 @@ class FetchMMData:
 
         sync_in_progress = False
 
-        # Update last_fetch_time in shelve store
-        with shelve.open(LAST_FETCH_TIME_SHELVE) as db: # handles the closing of the shelve file automatically with context manager
-            # Set the last fetch time to the current time for next api call
-            db[LAST_FETCH_TIME_SHELVE] = current_time
-        # Update global last_fetch_time
-        self.last_fetch_time = current_time
-
-        with shelve.open(TOTAL_POSTS_SHELVE) as db:
-            db[TOTAL_POSTS_SHELVE] = total_posts + no_posts
-        self.prev_total_posts = total_posts + no_posts
-
-        # Register next schedule
-        self.next_fetch_scheduler.enter(
-            self.fetch_interval_in_seconds,
-            1, 
-            self.get_posts_for_all_channels
-            # []
+        self.store_updated_values(
+            updated_sync_time=current_time,
+            updated_total_posts=total_posts + no_posts
         )
-        self.next_fetch_scheduler.run()
 
-    def delete_and_filter_posts(self, posts):
-        # TODO: filter out any stickers / emojis
-        # TODO: replace user handles with their real names
-        filtered_posts = []
-        for post in posts:
-            # print('POST ************** ', post)
-            if post['delete_at'] > 0:
-                total_posts-=1    # Deleted messages don't decrease the total_message_count from the API
-                collection.delete(ids=[post['id']])    # If the post has been deleted, also delete the message from Chroma
-                print('Message deleted!')
-            # Filter out any channel join and other type messages. Also filter out any empty string messages (only images, audio, ...)
-            elif (post['type']=='' and post['message']): # If the 'type' is empty, that means it's a normal message (instead of 'system_join_channel')
-                user_details = self.fetch_mm_details.get_user_details(post['user_id'], 'first_name', 'last_name', 'username')
-                post['message'] = f"({ datetime.utcfromtimestamp(post['update_at'] / 1000).date() }) { user_details['name'] }: { post['message'] }"
-                filtered_posts.append(post)
+        self.next_sync_scheduler.register_schedule(
+            seconds=self.sync_interval_in_seconds,
+            scheduler_function=self.sync_latest_posts
+        )
 
-        return filtered_posts
+    def store_updated_values(self, updated_sync_time, updated_total_posts):
+        # Update last_sync_time in shelve store
+        store(
+            shelve_name=LAST_SYNC_TIME_SHELVE,
+            last_sync_time=updated_sync_time
+        )
+        # with shelve.open(LAST_SYNC_TIME_SHELVE) as db: # handles the closing of the shelve file automatically with context manager
+        #     # Set the last fetch time to the current time for next api call
+        #     db[LAST_SYNC_TIME_SHELVE] = current_time
+        # # Update global last_sync_time
+        self.last_sync_time = updated_sync_time
+
+        store(
+            shelve_name=TOTAL_POSTS_SHELVE,
+            total_posts=updated_total_posts
+        )
+        # with shelve.open(TOTAL_POSTS_SHELVE) as db:
+        #     db[TOTAL_POSTS_SHELVE] = total_posts + no_posts
+        self.prev_total_posts = updated_total_posts
+
     
-    def upsert_channel_posts(self, posts, access, source='mm'):
-        if not posts:
-            print('No posts to add to Chroma!')
-            return
-        user_ids=[post['user_id'] for post in posts]
-        channel_ids=[post['channel_id'] for post in posts]
-        '''
-            {
-                "id" : "message_id",
-                "document" : "(date) User: message_text",
-                "metadata" : {
-                    "source": "mm",
-                    "access" : "pri / pub",
-                    "channel_id" : "ch_sdfsa",
-                    "user_id" : "usr_dfsdf",
-                }
-            }
-        '''
-        collection.upsert(
-            ids=[post['id'] for post in posts],
-            documents=[post['message'] for post in posts],
-            metadatas=[{**{'user_id': x}, 
-                        **{'channel_id': y},
-                        "access": access,
-                        "source": source}  for x, y in zip(user_ids, channel_ids)]
-        )
+    # For real-time update of the fetch interval (without reinstantiating the 'Mattermost' Class)
+    # @staticmethod
+    # def update_sync_interval(self, interval):
+    #     self.sync_interval_in_seconds = interval
 
 
 def is_sync_inprogress():
