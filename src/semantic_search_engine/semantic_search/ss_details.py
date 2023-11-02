@@ -1,6 +1,6 @@
 from datetime import datetime
 from semantic_search_engine.slack.slack import Slack as Sl
-from semantic_search_engine.mattermost.fetch_mm_data_details import FetchMMDetails
+from semantic_search_engine.mattermost.mm_details import MMDetails
 
 from os import getenv
 from dotenv import load_dotenv
@@ -13,7 +13,7 @@ class SemanticSearchDetails:
 
         self.access_token = access_token
         # Initialze MMApi with the user's access_token
-        self.mm_details = FetchMMDetails(access_token=self.access_token)
+        self.mm_details = MMDetails(access_token=self.access_token)
 
         self.user_id = user_info['user_id']
         self.user_email = user_info['email']

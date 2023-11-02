@@ -4,7 +4,7 @@ from sched import scheduler
 
 from semantic_search_engine.constants import DEFAULT_LAST_SYNC_TIME, DEFAULT_TOTAL_POSTS, LAST_SYNC_TIME_SHELVE, MM_PAT_ID_SHELVE, TOTAL_POSTS_SHELVE
 from semantic_search_engine.mattermost.mm_api import MattermostAPI
-from semantic_search_engine.mattermost.fetch_mm_data import FetchMMData
+from semantic_search_engine.mattermost.sync_posts import SyncPosts
 from semantic_search_engine.mattermost.mm_scheduler import MMScheduler
 from semantic_search_engine.shelves import store
 from . import collection
@@ -38,7 +38,7 @@ class Mattermost:
         ).create_new_pat()
 
         # Set the global MMApi instance with the new pat of the Admin
-        sync_latest_posts = FetchMMData(
+        sync_latest_posts = SyncPosts(
             access_token=personal_access_token,
             next_sync_scheduler=self.next_sync_scheduler
         ).sync_latest_posts

@@ -1,6 +1,6 @@
 from semantic_search_engine.mattermost.mm_api import MattermostAPI
 
-class FetchMMDetails:
+class MMDetails:
 
     def __init__(self, access_token) -> None:
         self.mm_api_request = MattermostAPI( access_token=access_token ).mm_api_request

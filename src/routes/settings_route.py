@@ -32,7 +32,7 @@ def set_sync_interval(loggedin_user):
                 sync_interval_db = store( SYNC_INTERVAL_SHELVE, sync_interval )
                 # with shelve.open( SYNC_INTERVAL_SHELVE ) as sync_interval_db:
                 #     sync_interval_db[SYNC_INTERVAL_SHELVE] = sync_interval
-                    # FetchMMData.update_sync_interval(sync_interval_db[SYNC_INTERVAL_SHELVE])
+                    # SyncPosts.update_sync_interval(sync_interval_db[SYNC_INTERVAL_SHELVE])
                     # return Response(to_json( dict(sync_interval_db) ), status=200, mimetype='application/json')
                 return Response(to_json( sync_interval_db ), status=200, mimetype='application/json')
             else:

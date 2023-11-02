@@ -3,7 +3,7 @@ from time import sleep, time
 from flask import Blueprint, Response
 from json import dumps as to_json
 from . import mattermost
-from semantic_search_engine.mattermost.fetch_mm_data import get_sync_percentage, is_sync_inprogress
+from semantic_search_engine.mattermost.sync_posts import get_sync_percentage, is_sync_inprogress
 from routes.login_decorator import login_required
 
 sync_bp = Blueprint('sync', __name__)
@@ -69,7 +69,7 @@ def sync_in_progress(loggedin_user):
             global prev_in_progress
             if sync_in_progress != prev_in_progress:
                 prev_in_progress = sync_in_progress
-                yield f"data: prog{ sync_in_progress }\n\n"
+                yield f"data: { sync_in_progress }\n\n"
             elif time() > start_time + timeout:
                 break
             
@@ -87,7 +87,7 @@ def is_sync_started(loggedin_user):
             global prev_is_syncing
             if mattermost.is_syncing() != prev_is_syncing:
                 prev_is_syncing = mattermost.is_syncing()
-                yield f"data: sync{ mattermost.is_syncing() }\n\n"
+                yield f"data: { mattermost.is_syncing() }\n\n"
             elif time() > start_time + timeout:
                 break
 
@@ -105,7 +105,7 @@ def get_sync_progress(loggedin_user):
             global prev_sync_progress
             if sync_percentage != prev_sync_progress:
                 prev_sync_progress = sync_percentage
-                yield f"data: percent{ sync_percentage }\n\n"
+                yield f"data: { sync_percentage }\n\n"
             elif time() > start_time + timeout:
                 break
             

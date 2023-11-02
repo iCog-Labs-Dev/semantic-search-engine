@@ -4,7 +4,7 @@ from json import dumps as to_json
 from datetime import datetime
 from time import time, sleep
 from semantic_search_engine.mattermost.mm_api import MattermostAPI
-from semantic_search_engine.mattermost.fetch_mm_data_details import FetchMMDetails
+from semantic_search_engine.mattermost.mm_details import MMDetails
 from semantic_search_engine.mattermost.mm_scheduler import MMScheduler
 from semantic_search_engine.shelves import retrieve_one, store
 from . import collection
@@ -12,11 +12,11 @@ from . import collection
 sync_in_progress = False
 sync_percentage = 0
 
-class FetchMMData:
+class SyncPosts:
 
     def __init__(self, access_token, next_sync_scheduler) -> None:
         self.mm_api_request = MattermostAPI( access_token=access_token ).mm_api_request
-        self.fetch_mm_details = FetchMMDetails( access_token=access_token )
+        self.fetch_mm_details = MMDetails( access_token=access_token )
         self.next_sync_scheduler: MMScheduler = next_sync_scheduler
 
         self.sync_interval_in_seconds = retrieve_one( shelve_name=SYNC_INTERVAL_SHELVE, key='sync_interval' )
