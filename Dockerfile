@@ -6,7 +6,7 @@ COPY . .
 RUN pip install --upgrade pip
 # RUN pip freeze
 # RUN pip install -r requirements.txt
-RUN install.sh
+RUN ./install.sh
 
 CMD ["python", "./server.py"]
 
