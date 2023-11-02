@@ -3,6 +3,7 @@ from json import dumps as to_json
 from flask import Response
 from semantic_search_engine.constants import CHROMA_SHELVE
 from semantic_search_engine.semantic_search.ss_details import SemanticSearchDetails
+from semantic_search_engine.shelves import retrieve
 from . import collection, chain
 
 class SemanticSearch():
@@ -15,9 +16,13 @@ class SemanticSearch():
         self.user_name = user_info['name']
 
         # Get the number of results to be returned by Chroma from shelve
-        with shelve.open(CHROMA_SHELVE) as chroma_shelve:
-            self.chroma_n_results = int(chroma_shelve[ 'chroma_n_results' ])
-            self.max_chroma_distance = float(chroma_shelve[ 'max_chroma_distance' ])
+        chroma_shelve = retrieve( CHROMA_SHELVE, 'chroma_n_results', 'max_chroma_distance' )
+        self.chroma_n_results = int( chroma_shelve[0] )
+        self.max_chroma_distance = float( chroma_shelve[1] )
+
+        # with shelve.open(CHROMA_SHELVE) as chroma_shelve:
+        #     self.chroma_n_results = int(chroma_shelve[ 'chroma_n_results' ])
+        #     self.max_chroma_distance = float(chroma_shelve[ 'max_chroma_distance' ])
        
     # def semantic_search(self, query : str, with_llm: bool = True):
     def get_chroma_metadata(self, query : str):
