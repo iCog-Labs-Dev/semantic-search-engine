@@ -4,6 +4,8 @@ WORKDIR /app
 COPY . .
 
 RUN pip install --upgrade pip
+RUN pip install virtualenv
+RUN source venv/bin/activate
 # RUN pip freeze
 # RUN pip install -r requirements.txt
 RUN ./install.sh
