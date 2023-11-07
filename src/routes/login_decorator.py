@@ -17,7 +17,7 @@ def login_required(admin_only: bool):
             cookies = dict(request.cookies)
             auth_token = cookies.get('MMAUTHTOKEN')
             user_id = cookies.get('MMUSERID')
-            # print(cookies)
+            print('Cookies: ', user_id, ' ***** ', auth_token)
             if not (auth_token and user_id):
                 return Response(to_json({ 'message' : 'You must send requests with credentials enabled and be logged in!' }), status=400, mimetype='application/json')
             
@@ -46,7 +46,7 @@ def login_required(admin_only: bool):
             loggedin_user = {
                 'auth_token': auth_token,
                 'user_info': {
-                    'user_id': user_id,
+                    'user_id': user_details.get('id', '') or user_id,
                     'name': f"{user_details.get('first_name', '')} {user_details.get('last_name', '')}".strip() or  user_details.get('username', ''),
                     'email': user_email
                 }

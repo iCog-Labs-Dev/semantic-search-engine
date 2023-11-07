@@ -11,9 +11,9 @@ root_bp = Blueprint("root", __name__)
 
 # ************************************************************** /ping
 
-@root_bp.route('/ping', methods=['HEAD'])
+@root_bp.route('/ping', methods=['GET', 'HEAD'])
 def ping():
-    return ''
+    return Response(to_json('Hi'), status=200, mimetype='application/json')
 
 # ************************************************************** /
 
