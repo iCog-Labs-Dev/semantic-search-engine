@@ -35,7 +35,111 @@ class SyncPosts:
         all_channels = self.mm_api_request('/channels')
         channel_fields = [{field: res[field] for field in fields} for res in all_channels]
         return channel_fields
+
+    def sync_latest_posts(self):
+        print(f"\n {'*'*50} \n")
+
+        global sync_in_progress
+        sync_in_progress = True
+        
+        # Save the current time (before requesting the API)
+        current_time = time()
+
+        # Define 'since' in the request parameters. It will fetch all posts if this isn't defined
+        post_params = {}
+        if self.last_sync_time != 0 and self.prev_total_posts != 0:
+            post_params = { 'since': int(self.last_sync_time * 1000) } # convert to milliseconds
+
+        # Get all channels' data
+        channels = self.get_all_channels('id', 'type', 'total_msg_count', 'display_name') 
+        self.current_total_posts = sum( [int(channel['total_msg_count']) for channel in channels] )
+
+        # Get the total number of posts since last sync
+        self.total_posts = self.current_total_posts - self.prev_total_posts
+        no_posts = 0
+
+        for channel in channels:
+            # 200 is the max number of posts per page
+            # reset page to 0 for each channel
+            post_params.update({'per_page': 10, 'page': 0})
+
+            # previous_post_id is used to check if there are more pages of posts
+            previous_post_id = '~'
+
+            # Loop through all pages of posts for the channel
+            while previous_post_id != '':
+                # Get the server response for each page of posts
+                posts_res = self.mm_api_request(
+                    "/channels/" + channel["id"] + "/posts",
+                    params=post_params
+                )
+
+                # Get the ids for all posts in the 'order' field and filter out each post_detail_fields we want for each post
+                '''
+                This is the schema for the response:
+                    {
+                        "order": [ ...list of post_ids... ],
+                        "posts": {
+                            ...."post_id_1": { ...1st post details... },
+                                "post_id_2": { ...2nd post details... }...  }
+                    }
+                '''
+                # Change the posts into a list of dictionaries with the above 'fields'
+                posts = []
+                fields = ['id', 'message', 'user_id', 'type', 'update_at', 'delete_at', 'channel_id']   # The required fields for each post
+                for postId in posts_res['order']:
+                    posts.append( { field: posts_res['posts'][postId][field] for field in fields } )
+                no_posts += len(posts)
+                # posts = [ { field: posts_res['posts'][postId][field] for field in fields } for postId in posts_res['order'] ]
+
+                # Get the channel's access restriction (private / public)
+                access = ''
+                if channel["type"] == 'O':  access = 'pub'
+                elif channel["type"] == 'P':  access = 'pri'
+                else: continue
+                
+                # Remove deleted posts from chroma and filter out any irrelevant posts
+                filtered_posts = self.delete_and_filter_posts(
+                    posts=posts
+                )
+                
+                # Upsert the filtered channel posts to Chroma
+                self.upsert_mm_channel_posts(
+                    posts=filtered_posts, 
+                    access=access
+                )
+
+                # Update the page number and previous_post_id for the next page of posts
+                post_params['page'] += 1
+                previous_post_id = posts_res['prev_post_id']
+
+                # yield with progress on every batch of posts fetched from MM's API
+                if self.total_posts != 0:
+                    # yield f'data: { round(no_posts / (total_posts-9), 3) }\n\n'
+                    global sync_percentage
+                    sync_percentage = abs( round(no_posts / (self.total_posts), 3) )
+                    print('Sync Progress: ', sync_percentage )
+
+            # yield to indicate channel is complete
+            # yield f'data: { channel["display_name"] }\n\n'
+        
+        print('Total posts: ', self.total_posts)
+        print('Total posts fetched: ', no_posts)
+
+        sync_in_progress = False
+
+        self.store_updated_values(
+            updated_sync_time=current_time,
+            updated_total_posts=self.current_total_posts
+        )
+
+        self.next_sync_scheduler.register_schedule(
+            seconds=self.sync_interval_in_seconds,
+            scheduler_function=self.sync_latest_posts
+        )
     
+    # --------- ######################### Helper Functions ######################### ---------
+     
     def delete_and_filter_posts(self, posts):
         # TODO: filter out any stickers / emojis
         # TODO: replace user handles with their real names
@@ -43,7 +147,6 @@ class SyncPosts:
         for post in posts:
             # print('POST ************** ', post)
             if post['delete_at'] > 0:
-                total_posts-=1    # Deleted messages don't decrease the total_message_count from the API
                 collection.delete(ids=[post['id']])    # If the post has been deleted, also delete the message from Chroma
                 print('Message deleted!')
             # Filter out any channel join and other type messages. Also filter out any empty string messages (only images, audio, ...)
@@ -54,9 +157,8 @@ class SyncPosts:
 
         return filtered_posts
     
-    def upsert_channel_posts(self, posts, access, source='mm'):
+    def upsert_mm_channel_posts(self, posts, access):
         if not posts:
-            print('No posts to add to Chroma!')
             return
         try:
             user_ids=[post['user_id'] for post in posts]
@@ -79,111 +181,10 @@ class SyncPosts:
                 metadatas=[{**{'user_id': x}, 
                             **{'channel_id': y},
                             "access": access,
-                            "source": source}  for x, y in zip(user_ids, channel_ids)]
+                            "source": 'mm'}  for x, y in zip(user_ids, channel_ids)]
             )
         except Exception as err:
             raise(f'Error while upserting Mattermost messages: {str(err)} ')
-
-
-    def sync_latest_posts(self):
-        print(f"\n {'*'*50} \n")
-
-        global sync_in_progress
-        sync_in_progress = True
-
-        # Calculate the time passed since last sync
-        time_passed_in_seconds = (time() - self.last_sync_time)
-        print('Time passed since last fetch: ', time_passed_in_seconds)
-
-        post_params = {}
-
-        # if time_passed_in_seconds >= self.sync_interval_in_seconds and last_sync_time != 0:
-        if self.last_sync_time != 0 and self.prev_total_posts != 0:
-            post_params = { 'since': int(self.last_sync_time * 1000) } # convert to milliseconds
-        
-        # Get all channels' data
-        channels = self.get_all_channels('id', 'type', 'total_msg_count', 'display_name') 
-        current_total_posts = sum( [int(channel['total_msg_count']) for channel in channels] )
-
-        # Get the total number of posts since last sync
-        total_posts = current_total_posts - self.prev_total_posts
-
-        # Save the current time (before requesting the API)
-        current_time = time()
-        no_posts = 0
-        no_filtered_posts = 0
-
-        for channel in channels:
-            # 200 is the max number of posts per page
-            # reset page to 0 for each channel
-            post_params.update({'per_page': 10, 'page': 0})
-
-            # previous_post_id is used to check if there are more pages of posts
-            previous_post_id = '~'
-
-            # Loop through all pages of posts for the channel
-            while previous_post_id != '':
-                # Get the server response for each page of posts
-                posts_res = self.mm_api_request(
-                    "/channels/" + channel["id"] + "/posts",
-                    params=post_params
-                )
-
-                fields = ['id', 'message', 'user_id', 'type', 'update_at', 'delete_at', 'channel_id']   # The required fields for each post
-                # Get the ids for all posts in the 'order' field and filter out each post_detail_fields we want for each post
-                '''
-                This is the schema for the response:
-                    {
-                        "order": [ ...list of post_ids... ],
-                        "posts": {
-                            ...."post_id_1": { ...1st post details... },
-                                "post_id_2": { ...2nd post details... }...  }
-                    }
-                '''
-                # Change the posts into a list of dictionaries with the above 'fields'
-                posts = [ { field: posts_res['posts'][postId][field] for field in fields } for postId in posts_res['order'] ]
-
-                # Get the channel's access restriction (private / public)
-                access = ''
-                if channel["type"] == 'O':  access = 'pub'
-                elif channel["type"] == 'P':  access = 'pri'
-                else: continue
-                
-                # Remove deleted posts from chroma and filter out any irrelevant posts
-                filtered_posts = self.delete_and_filter_posts(posts=posts)
-                
-                # Upsert the filtered channel posts to Chroma
-                self.upsert_channel_posts(posts=filtered_posts, access=access)
-
-                # Update the page number and previous_post_id for the next page of posts
-                post_params['page'] += 1
-                previous_post_id = posts_res['prev_post_id']
-                no_filtered_posts += len(filtered_posts)
-                no_posts += len(posts)
-                    
-                # TODO: yield with progress on every batch of posts fetched from MM's API
-                if total_posts != 0:
-                    # yield f'data: { round(no_posts / (total_posts-9), 3) }\n\n'
-                    global sync_percentage
-                    sync_percentage = round(no_posts / (total_posts), 3)
-                    print('Sync Progress: ', sync_percentage )
-            # TODO: yield to indicate channel is complete
-            # yield f'data: { channel["display_name"] }\n\n'
-        
-        print('Total posts: ', total_posts)
-        print('Total posts fetched: ', no_posts)
-
-        sync_in_progress = False
-
-        self.store_updated_values(
-            updated_sync_time=current_time,
-            updated_total_posts=total_posts + no_posts
-        )
-
-        self.next_sync_scheduler.register_schedule(
-            seconds=self.sync_interval_in_seconds,
-            scheduler_function=self.sync_latest_posts
-        )
 
     def store_updated_values(self, updated_sync_time, updated_total_posts):
         # Update last_sync_time in shelve store
