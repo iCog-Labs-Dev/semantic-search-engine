@@ -12,7 +12,7 @@ sync_bp = Blueprint('sync', __name__)
 prev_is_syncing = False
 prev_in_progress = False
 prev_sync_progress = 0
-timeout = 60 #* 10 # The timeout to break the SSE event loop
+timeout = 60 * 30 # The timeout to break the SSE event loop
    
 # ************************************************************** /start_sync
     
@@ -106,8 +106,10 @@ def get_sync_progress(loggedin_user):
             if sync_percentage != prev_sync_progress:
                 prev_sync_progress = sync_percentage
                 yield f"data: { sync_percentage }\n\n"
+            elif mattermost.is_syncing() and not is_sync_inprogress():
+                break
             elif time() > start_time + timeout:
                 break
             
-            sleep(1)
+            sleep(0.5)
     return Response(sync_progress(), content_type='text/event-stream')
