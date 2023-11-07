@@ -70,7 +70,6 @@ class Mattermost:
                 shelve_name=LAST_SYNC_TIME_SHELVE,
                 last_sync_time=DEFAULT_LAST_SYNC_TIME
             )
-            self.last_sync_time = DEFAULT_LAST_SYNC_TIME
             # # Reset last_sync_time in shelve store
             # with shelve.open(LAST_SYNC_TIME_SHELVE) as last_sync_time:
             #     last_sync_time[LAST_SYNC_TIME_SHELVE] = DEFAULT_LAST_SYNC_TIME
@@ -79,9 +78,8 @@ class Mattermost:
                 
             store(
                 shelve_name=TOTAL_POSTS_SHELVE,
-                last_sync_time=DEFAULT_TOTAL_POSTS
+                total_posts=DEFAULT_TOTAL_POSTS
             )
-            self.last_sync_time = DEFAULT_TOTAL_POSTS
             # with shelve.open(TOTAL_POSTS_SHELVE) as total_posts:
             #     total_posts[TOTAL_POSTS_SHELVE] = DEFAULT_TOTAL_POSTS
             #     self.prev_total_posts = DEFAULT_TOTAL_POSTS
