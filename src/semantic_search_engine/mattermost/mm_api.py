@@ -1,5 +1,5 @@
 import os, requests, json
-from src.semantic_search_engine.constants import MM_PAT_ID_SHELVE
+from semantic_search_engine.constants import MM_PAT_ID_SHELVE
 from dotenv import load_dotenv
 
 load_dotenv()

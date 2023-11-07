@@ -1,13 +1,13 @@
 from chromadb import EmbeddingFunction
-from src.semantic_search_engine.llm import TogetherLLM
-from src.semantic_search_engine.chroma import  get_chroma_collection
-from src.semantic_search_engine.constants import CHROMA_N_RESULTS_SHELVE, DEFAULT_MAX_CHROMA_DISTANCE
+from semantic_search_engine.llm import TogetherLLM
+from semantic_search_engine.chroma import  get_chroma_collection
+from semantic_search_engine.constants import CHROMA_N_RESULTS_SHELVE, DEFAULT_MAX_CHROMA_DISTANCE
 from langchain import LLMChain, PromptTemplate
 from chromadb.utils import embedding_functions
 from langchain.llms.base import LLM
 from datetime import datetime
-from src.semantic_search_engine.mattermost.mm_api import MattermostAPI as MMApi
-from src.semantic_search_engine.slack.slack import Slack as Sl
+from semantic_search_engine.mattermost.mm_api import MattermostAPI as MMApi
+from semantic_search_engine.slack.slack import Slack as Sl
 import os, shelve
 
 from json import dumps as to_json

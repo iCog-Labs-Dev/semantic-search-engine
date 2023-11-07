@@ -2,8 +2,8 @@ import shelve
 from time import time, sleep
 from sched import scheduler
 
-from src.semantic_search_engine.constants import DEFAULT_LAST_FETCH_TIME, FETCH_INTERVAL_SHELVE, LAST_FETCH_TIME_SHELVE, MM_PAT_ID_SHELVE
-from src.semantic_search_engine.mattermost.mm_api import MattermostAPI as MMApi
+from semantic_search_engine.constants import DEFAULT_LAST_FETCH_TIME, FETCH_INTERVAL_SHELVE, LAST_FETCH_TIME_SHELVE, MM_PAT_ID_SHELVE
+from semantic_search_engine.mattermost.mm_api import MattermostAPI as MMApi
 from datetime import datetime
 
 class Mattermost:

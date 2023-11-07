@@ -1,6 +1,6 @@
 import os
 from peewee import SqliteDatabase
-from src.semantic_search_engine.constants import TEMP_SLACK_DATA_PATH, SQLITE_PATH
+from semantic_search_engine.constants import TEMP_SLACK_DATA_PATH, SQLITE_PATH
 
 os.makedirs(TEMP_SLACK_DATA_PATH, exist_ok=True)
 
