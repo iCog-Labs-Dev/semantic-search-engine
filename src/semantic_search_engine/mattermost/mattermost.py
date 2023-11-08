@@ -8,14 +8,17 @@ from semantic_search_engine.mattermost.sync_posts import SyncPosts
 from semantic_search_engine.mattermost.mm_scheduler import MMScheduler
 from semantic_search_engine.shelves import store
 from . import collection
+# TODO: Temp NO AUTH
+from semantic_search_engine.shelves import retrieve_one
 
 class Mattermost:
 
     def __init__(self) -> None:
         self.next_sync_scheduler = MMScheduler()
 
-
-    def start_sync(self, temp_access_token: str) -> None:
+    # TODO: Temp NO AUTH
+    def start_sync(self) -> None:
+    # def start_sync(self, temp_access_token: str) -> None:
 
         # Get the last fetch time from shelve file store
         # with shelve.open(LAST_SYNC_TIME_SHELVE) as db: # handles the closing of the shelve file automatically with context manager
@@ -31,11 +34,18 @@ class Mattermost:
         if self.is_syncing(): 
             print('Sync has already started!')
             return
+        
+        # TODO: Temp NO AUTH
+        personal_access_token = retrieve_one(
+            shelve_name='pat',
+            key='personal_access_token'
+        )
 
-        # Delete the previous and create a new personal access token for the Admin
-        personal_access_token = MattermostAPI(
-            access_token=temp_access_token
-        ).create_new_pat()
+        # TODO: Temp NO AUTH
+        # # Delete the previous and create a new personal access token for the Admin
+        # personal_access_token = MattermostAPI(
+        #     access_token=temp_access_token
+        # ).create_new_pat()
 
         # Set the global MMApi instance with the new pat of the Admin
         sync_latest_posts = SyncPosts(

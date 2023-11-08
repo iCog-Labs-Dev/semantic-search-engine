@@ -19,9 +19,12 @@ timeout = 60 * 30 # The timeout to break the SSE event loop
 @sync_bp.route('/start')#, methods=['GET'])
 @login_required(admin_only=True)
 def start_sync(loggedin_user):
-    access_token = loggedin_user['auth_token']
+    # TODO: Temp NO AUTH
+    # access_token = loggedin_user['auth_token']
     try:
-        sync_thread = threading.Thread(target=mattermost.start_sync, args=(access_token,))
+        # TODO: Temp NO AUTH
+        sync_thread = threading.Thread(target=mattermost.start_sync)
+        # sync_thread = threading.Thread(target=mattermost.start_sync, args=(access_token,))
         sync_thread.start()
 
         sleep(1)    # Wait for the first sync to be scheduled

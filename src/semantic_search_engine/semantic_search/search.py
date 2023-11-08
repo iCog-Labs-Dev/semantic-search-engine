@@ -5,15 +5,43 @@ from semantic_search_engine.constants import CHROMA_SHELVE
 from semantic_search_engine.semantic_search.ss_details import SemanticSearchDetails
 from semantic_search_engine.shelves import retrieve
 from . import collection, chain
+# TODO: Temp NO AUTH
+from semantic_search_engine.shelves import retrieve_one
+import requests, os
+from dotenv import load_dotenv
+load_dotenv()
+mm_api_url = os.getenv("MM_API_URL")
 
 class SemanticSearch():
+    # TODO: Temp NO AUTH
+    def __init__(self, user_id: str) -> None:
+    # def __init__(self, access_token: str, user_info: dict) -> None:
+        # self.ss_details = SemanticSearchDetails(
+        #     access_token=access_token,
+        #     user_info=user_info
+        # )
+        # self.user_name = user_info['name']
 
-    def __init__(self, access_token: str, user_info: dict) -> None:
-        self.ss_details = SemanticSearchDetails(
-            access_token=access_token,
-            user_info=user_info
+        # TODO: Temp NO AUTH
+        ##########################################
+        pat = retrieve_one(
+            shelve_name='pat',
+            key='personal_access_token'
         )
-        self.user_name = user_info['name']
+        res = requests.get(
+            f'{mm_api_url}/users/{user_id}',
+            headers={ "Authorization": f"Bearer {pat}" },
+        )
+        user_details = res.json()
+
+        self.ss_details = SemanticSearchDetails(
+            access_token=pat,
+            user_email= user_details.get('email', ''),
+            user_id=user_id
+        )
+        self.user_name = f"{user_details.get('first_name', '')} {user_details.get('last_name', '')}".strip() or  user_details.get('username', '')
+        ##########################################
+
 
         # Get the number of results to be returned by Chroma from shelve
         chroma_shelve = retrieve( CHROMA_SHELVE, 'chroma_n_results', 'max_chroma_distance' )

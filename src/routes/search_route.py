@@ -19,15 +19,23 @@ def semantic_search(loggedin_user, option):
 
     elif request.method == 'POST':
         query = request.json.get('query', False)
+        # TODO: Temp NO AUTH
+        user_id = request.json.get('user_id', '')
+
         if not query:
             return Response(to_json({ 'message' : 'Please provide a query!' }), status=400, mimetype='application/json')
         if len(query) < 2 or len(query) > 500:
             return Response(to_json({ 'message' : 'The query must be between 2 - 500 characters long.' }), status=400, mimetype='application/json')
             
         try:
+            # TODO: Temp NO AUTH
+            # semantic_client = SemanticSearch(
+            #     access_token=loggedin_user['auth_token'],
+            #     user_info=loggedin_user['user_info']
+            # )
+            # TODO: Temp NO AUTH
             semantic_client = SemanticSearch(
-                access_token=loggedin_user['auth_token'],
-                user_info=loggedin_user['user_info']
+                user_id=user_id
             )
 
             return semantic_client.semantic_search(

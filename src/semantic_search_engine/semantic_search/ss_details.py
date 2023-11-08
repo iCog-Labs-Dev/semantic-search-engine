@@ -7,16 +7,20 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class SemanticSearchDetails:
-
-    def __init__(self, access_token, user_info) -> None:
+    # TODO: Temp NO AUTH
+    def __init__(self, access_token, user_email, user_id) -> None:
+    # def __init__(self, access_token, user_info) -> None:
         self.mm_url = getenv("MM_URL")
 
         self.access_token = access_token
         # Initialze MMApi with the user's access_token
         self.mm_details = MMDetails(access_token=self.access_token)
 
-        self.user_id = user_info['user_id']
-        self.user_email = user_info['email']
+        # TODO: Temp NO AUTH
+        # self.user_id = user_info['user_id']
+        # self.user_email = user_info['email']
+        self.user_id = user_id
+        self.user_email = user_email
 
     def get_user_channel_list(self) -> str:
         """Fetchs the list of channels of a user from Mattermost and Slack

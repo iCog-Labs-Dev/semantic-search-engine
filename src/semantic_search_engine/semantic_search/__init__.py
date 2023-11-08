@@ -1,6 +1,8 @@
 import shelve
 from semantic_search_engine.together_llm import TogetherLLM
-from langchain import LLMChain, PromptTemplate
+# from langchain import LLMChain, PromptTemplate
+from langchain.prompts import PromptTemplate
+from langchain.chains import LLMChain
 from semantic_search_engine.chroma import ChromaSingleton
 from semantic_search_engine.constants import DEFAULT_CHROMA_N_RESULTS, DEFAULT_MAX_CHROMA_DISTANCE, CHROMA_SHELVE
 from semantic_search_engine.shelves import create_default_shelve

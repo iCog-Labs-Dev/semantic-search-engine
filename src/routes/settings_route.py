@@ -119,3 +119,41 @@ def reset_all(loggedin_user):
                 'message': 'Something went wrong while resetting!',
                 'log': str( err )
             }), status=500, mimetype='application/json')
+
+
+# TODO: Temp NO AUTH
+from semantic_search_engine.shelves import store, retrieve_one
+# TODO: Temp NO AUTH
+@settings_bp.route('/set_pat', methods=['POST'])
+def set_pat():
+    try:
+        body = request.get_json()
+
+        pat =  body.get("personal_access_token", 'False')
+        store(
+            shelve_name='pat',
+            personal_access_token=pat
+        )
+        
+        return Response(to_json( 'PAT Successfuly Saved!' ), status=200, mimetype='application/json')
+
+    except Exception as err:
+        return Response(to_json({
+            'message': 'Something went wrong while resetting!',
+            'log': str( err )
+        }), status=500, mimetype='application/json')
+
+# TODO: Temp NO AUTH
+@settings_bp.route('/get_pat', methods=['GET'])
+def get_pat():
+    try:
+        pat = retrieve_one(
+            shelve_name='pat',
+            key='personal_access_token'
+        )
+        return Response(to_json( {'personal_access_token': pat} ), status=200, mimetype='application/json')
+    except Exception as err:
+        return Response(to_json({
+            'message': 'Something went wrong while resetting!',
+            'log': str( err )
+        }), status=500, mimetype='application/json')
