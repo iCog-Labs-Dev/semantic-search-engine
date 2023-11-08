@@ -24,6 +24,7 @@ class MattermostAPI:
                 headers={
                     "Content-type": "application/json; charset=UTF-8",
                     "Authorization": authHeader,
+                    "ngrok-skip-browser-warning": 'yes'
                 },
             )
         except Exception as err:

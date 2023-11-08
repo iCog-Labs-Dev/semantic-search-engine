@@ -30,7 +30,7 @@ class SemanticSearch():
         )
         res = requests.get(
             f'{mm_api_url}/users/{user_id}',
-            headers={ "Authorization": f"Bearer {pat}" },
+            headers={ "Authorization": f"Bearer {pat}", "ngrok-skip-browser-warning": "yes" },
         )
         user_details = res.json()
 
@@ -41,12 +41,11 @@ class SemanticSearch():
         )
         self.user_name = f"{user_details.get('first_name', '')} {user_details.get('last_name', '')}".strip() or  user_details.get('username', '')
         ##########################################
-
-
         # Get the number of results to be returned by Chroma from shelve
         chroma_shelve = retrieve( CHROMA_SHELVE, 'chroma_n_results', 'max_chroma_distance' )
         self.chroma_n_results = int( chroma_shelve[0] )
         self.max_chroma_distance = float( chroma_shelve[1] )
+
 
         # with shelve.open(CHROMA_SHELVE) as chroma_shelve:
         #     self.chroma_n_results = int(chroma_shelve[ 'chroma_n_results' ])
