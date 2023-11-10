@@ -1,6 +1,7 @@
 from threading import Lock, Thread
 from semantic_search_engine import constants
 import chromadb
+from chromadb.utils import embedding_functions
 
 class _ChromaSingletonMeta(type):
     """A thread-safe implementation of a singleton class that creates chroma clients.\
@@ -37,7 +38,8 @@ class ChromaSingleton(metaclass=_ChromaSingletonMeta):
             use_path : bool = True, 
             database_path : str = constants.CHROMA_PATH, 
             host : str = constants.CHROMA_HOST, 
-            port : str = constants.CHROMA_PORT
+            port : str = constants.CHROMA_PORT,
+            embedding_function : chromadb.EmbeddingFunction = embedding_functions.DefaultEmbeddingFunction()
         ) -> None:
         """Instantiates different parameters required for creating a Chroma client
 
@@ -61,9 +63,10 @@ class ChromaSingleton(metaclass=_ChromaSingletonMeta):
         self.database_path = database_path
         self.host = host
         self.port = port
+        self.embedding_function = embedding_function
 
-    def get_connection(self):
-        """returns a single chroma client even on multiple calls
+    def get_connection(self) -> chromadb.API:
+        """Returns a single chroma client even on multiple calls
 
         Returns
         -------
@@ -79,14 +82,11 @@ class ChromaSingleton(metaclass=_ChromaSingletonMeta):
 
         return self._connection
 
-
-
-def get_chroma_collection(embedding_function):
-    collection = ChromaSingleton().\
-        get_connection().\
-        get_or_create_collection(
-            constants.CHROMA_COLLECTION,
-            embedding_function= embedding_function,
-            metadata={"hnsw:space": "cosine"} 
-        )
-    return collection
+    def get_chroma_collection(self) -> chromadb.Collection:
+        collection = self.get_connection().\
+            get_or_create_collection(
+                constants.CHROMA_COLLECTION,
+                embedding_function=self.embedding_function,
+                metadata={"hnsw:space": "cosine"} 
+            )
+        return collection
