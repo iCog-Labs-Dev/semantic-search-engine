@@ -1,13 +1,15 @@
 import os
+# import sys
+# sys.path.append('./src')
 from flask import Flask, request
 from flask_cors import CORS
 
-from routes.root_route import root_bp
-from routes.sync_route import sync_bp
-from routes.search_route import search_bp
-from routes.settings_route import settings_bp
-from routes.slack_route import slack_bp
-from semantic_search_engine.shelves import create_default_shelve
+from src.routes.root_route import root_bp
+from src.routes.sync_route import sync_bp
+from src.routes.search_route import search_bp
+from src.routes.settings_route import settings_bp
+from src.routes.slack_route import slack_bp
+from src.semantic_search_engine.shelves import create_default_shelve
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -17,7 +19,7 @@ app = Flask(__name__)
 # TODO: Temp NO AUTH
 # CORS(app)
 CORS(app=app,
-     origins=[os.getenv("MM_URL"), os.getenv("MM_API_URL")],
+     origins=[os.getenv("MM_URL"), os.getenv("MM_API_URL") or ''],
      supports_credentials=True)
 
 # Session config
@@ -26,8 +28,9 @@ CORS(app=app,
 # app.config['SESSION_COOKIE_SECURE'] = True
 
 # TODO: Temp NO AUTH
+from src.semantic_search_engine.constants import SHELVE_PATH
 create_default_shelve(
-    shelve_name='pat',
+    shelve_name=os.path.join(SHELVE_PATH, "pat"),
     personal_access_token=''
 )
 

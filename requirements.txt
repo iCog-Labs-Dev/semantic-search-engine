@@ -6,3 +6,5 @@ together
 langchain
 peewee
 python-dotenv
+gevent
+gunicorn
