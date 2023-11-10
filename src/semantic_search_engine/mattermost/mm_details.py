@@ -1,4 +1,4 @@
-from semantic_search_engine.mattermost.mm_api import MattermostAPI
+from src.semantic_search_engine.mattermost.mm_api import MattermostAPI
 
 class MMDetails:
 

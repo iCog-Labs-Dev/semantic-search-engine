@@ -1,8 +1,8 @@
 from os import remove, path
 from flask import request, Response, Blueprint
 from json import dumps as to_json
-from routes.login_decorator import login_required
-from semantic_search_engine.constants import TEMP_SLACK_DATA_PATH
+from src.routes.login_decorator import login_required
+from src.semantic_search_engine.constants import TEMP_SLACK_DATA_PATH
 from . import slack
 
 slack_bp = Blueprint('slack', __name__)

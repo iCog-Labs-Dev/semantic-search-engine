@@ -3,8 +3,8 @@ from time import sleep, time
 from flask import Blueprint, Response
 from json import dumps as to_json
 from . import mattermost
-from semantic_search_engine.mattermost.sync_posts import get_sync_percentage, is_sync_inprogress
-from routes.login_decorator import login_required
+from src.semantic_search_engine.mattermost.sync_posts import get_sync_percentage, is_sync_inprogress
+from src.routes.login_decorator import login_required
 
 sync_bp = Blueprint('sync', __name__)
 

@@ -1,9 +1,9 @@
 import shelve
 from flask import Blueprint, request, Response
 from json import dumps as to_json
-from semantic_search_engine.constants import SYNC_INTERVAL_SHELVE, CHROMA_SHELVE
-from routes.login_decorator import login_required
-from semantic_search_engine.shelves import store, retrieve
+from src.semantic_search_engine.constants import SYNC_INTERVAL_SHELVE, CHROMA_SHELVE
+from src.routes.login_decorator import login_required
+from src.semantic_search_engine.shelves import store, retrieve
 from . import mattermost, slack
 
 settings_bp = Blueprint("settings", __name__)
@@ -122,7 +122,7 @@ def reset_all(loggedin_user):
 
 
 # TODO: Temp NO AUTH
-from semantic_search_engine.shelves import store, retrieve_one
+from src.semantic_search_engine.shelves import store, retrieve_one
 # TODO: Temp NO AUTH
 @settings_bp.route('/set_pat', methods=['POST'])
 def set_pat():

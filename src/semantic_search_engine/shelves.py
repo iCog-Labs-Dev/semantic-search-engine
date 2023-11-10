@@ -1,6 +1,6 @@
 import shelve, os
-from semantic_search_engine.constants import SHELVE_PATH
-from semantic_search_engine.constants import *
+from src.semantic_search_engine.constants import SHELVE_PATH
+from src.semantic_search_engine.constants import *
 
 def get_default_key(shelve_name: str) -> str:
     switcher = {

@@ -1,8 +1,8 @@
 import shelve
 import os
-from semantic_search_engine.constants import *
-from semantic_search_engine.chroma import ChromaSingleton
-from semantic_search_engine.shelves import create_default_shelve
+from src.semantic_search_engine.constants import *
+from src.semantic_search_engine.chroma import ChromaSingleton
+from src.semantic_search_engine.shelves import create_default_shelve
 
 collection = ChromaSingleton().get_chroma_collection()
 

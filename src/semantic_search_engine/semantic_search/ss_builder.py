@@ -1,8 +1,8 @@
 from langchain.llms.base import LLM
 from chromadb import EmbeddingFunction
 from langchain import LLMChain, PromptTemplate
-from semantic_search_engine.chroma import  get_chroma_collection
-from semantic_search_engine.semantic_search.search import SemanticSearch
+from src.semantic_search_engine.chroma import  get_chroma_collection
+from src.semantic_search_engine.semantic_search.search import SemanticSearch
 
 class SemanticSearchBuilder():
     """A builder pattern class used to build a semantic search

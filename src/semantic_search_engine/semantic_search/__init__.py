@@ -1,11 +1,11 @@
 import shelve
-from semantic_search_engine.together_llm import TogetherLLM
+from src.semantic_search_engine.together_llm import TogetherLLM
 # from langchain import LLMChain, PromptTemplate
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
-from semantic_search_engine.chroma import ChromaSingleton
-from semantic_search_engine.constants import DEFAULT_CHROMA_N_RESULTS, DEFAULT_MAX_CHROMA_DISTANCE, CHROMA_SHELVE
-from semantic_search_engine.shelves import create_default_shelve
+from src.semantic_search_engine.chroma import ChromaSingleton
+from src.semantic_search_engine.constants import DEFAULT_CHROMA_N_RESULTS, DEFAULT_MAX_CHROMA_DISTANCE, CHROMA_SHELVE
+from src.semantic_search_engine.shelves import create_default_shelve
 
 prompt_template = PromptTemplate( input_variables=["context", "query", "user"], template="""\
 [INST]\n

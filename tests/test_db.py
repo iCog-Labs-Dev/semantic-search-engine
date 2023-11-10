@@ -1,8 +1,8 @@
 # import unittest
-# from semantic_search_engine import db
+# from src.semantic_search_engine import db
 # from peewee import SqliteDatabase
 # import os
-# from semantic_search_engine import constants
+# from src.semantic_search_engine import constants
 
 # class TestSQLDatabase(unittest.TestCase):
 

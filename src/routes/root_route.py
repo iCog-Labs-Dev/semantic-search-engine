@@ -1,10 +1,10 @@
 import shelve
 from flask import Response, Blueprint
 from json import dumps as to_json
-from semantic_search_engine.constants import SYNC_INTERVAL_SHELVE, LAST_SYNC_TIME_SHELVE, CHROMA_SHELVE
-from routes.login_decorator import login_required
-from semantic_search_engine.mattermost.sync_posts import is_sync_inprogress
-from semantic_search_engine.shelves import retrieve_one
+from src.semantic_search_engine.constants import SYNC_INTERVAL_SHELVE, LAST_SYNC_TIME_SHELVE, CHROMA_SHELVE
+from src.routes.login_decorator import login_required
+from src.semantic_search_engine.mattermost.sync_posts import is_sync_inprogress
+from src.semantic_search_engine.shelves import retrieve_one
 from . import mattermost
 
 root_bp = Blueprint("root", __name__)

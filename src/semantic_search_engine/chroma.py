@@ -1,5 +1,5 @@
 from threading import Lock, Thread
-from semantic_search_engine import constants
+from src.semantic_search_engine import constants
 import chromadb
 from chromadb.utils import embedding_functions
 

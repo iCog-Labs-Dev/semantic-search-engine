@@ -1,8 +1,8 @@
 # from threading import Thread, Event
 # import unittest
 # import shutil
-# from semantic_search_engine.chroma import ChromaSingleton
-# from semantic_search_engine import constants
+# from src.semantic_search_engine.chroma import ChromaSingleton
+# from src.semantic_search_engine import constants
 
 # def create_singleton_instance(result, event):
 #     # Each thread will try to create an instance of the Singleton

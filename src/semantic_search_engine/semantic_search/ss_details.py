@@ -1,6 +1,6 @@
 from datetime import datetime
-from semantic_search_engine.slack.slack import Slack as Sl
-from semantic_search_engine.mattermost.mm_details import MMDetails
+from src.semantic_search_engine.slack.slack import Slack as Sl
+from src.semantic_search_engine.mattermost.mm_details import MMDetails
 
 from os import getenv
 from dotenv import load_dotenv

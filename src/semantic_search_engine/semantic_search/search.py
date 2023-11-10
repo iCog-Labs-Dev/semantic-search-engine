@@ -1,12 +1,12 @@
 import shelve
 from json import dumps as to_json
 from flask import Response
-from semantic_search_engine.constants import CHROMA_SHELVE
-from semantic_search_engine.semantic_search.ss_details import SemanticSearchDetails
-from semantic_search_engine.shelves import retrieve
+from src.semantic_search_engine.constants import CHROMA_SHELVE
+from src.semantic_search_engine.semantic_search.ss_details import SemanticSearchDetails
+from src.semantic_search_engine.shelves import retrieve
 from . import collection, chain
 # TODO: Temp NO AUTH
-from semantic_search_engine.shelves import retrieve_one
+from src.semantic_search_engine.shelves import retrieve_one
 import requests, os
 from dotenv import load_dotenv
 load_dotenv()

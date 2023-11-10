@@ -2,14 +2,14 @@ import shelve
 from time import time, sleep
 from sched import scheduler
 
-from semantic_search_engine.constants import DEFAULT_LAST_SYNC_TIME, DEFAULT_TOTAL_POSTS, LAST_SYNC_TIME_SHELVE, MM_PAT_ID_SHELVE, TOTAL_POSTS_SHELVE
-from semantic_search_engine.mattermost.mm_api import MattermostAPI
-from semantic_search_engine.mattermost.sync_posts import SyncPosts
-from semantic_search_engine.mattermost.mm_scheduler import MMScheduler
-from semantic_search_engine.shelves import store
+from src.semantic_search_engine.constants import DEFAULT_LAST_SYNC_TIME, DEFAULT_TOTAL_POSTS, LAST_SYNC_TIME_SHELVE, MM_PAT_ID_SHELVE, TOTAL_POSTS_SHELVE
+from src.semantic_search_engine.mattermost.mm_api import MattermostAPI
+from src.semantic_search_engine.mattermost.sync_posts import SyncPosts
+from src.semantic_search_engine.mattermost.mm_scheduler import MMScheduler
+from src.semantic_search_engine.shelves import store
 from . import collection
 # TODO: Temp NO AUTH
-from semantic_search_engine.shelves import retrieve_one
+from src.semantic_search_engine.shelves import retrieve_one
 
 class Mattermost:
 

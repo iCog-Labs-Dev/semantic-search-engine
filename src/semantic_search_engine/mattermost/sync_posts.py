@@ -1,12 +1,12 @@
 import shelve
-from semantic_search_engine.constants import LAST_SYNC_TIME_SHELVE, TOTAL_POSTS_SHELVE, SYNC_INTERVAL_SHELVE
+from src.semantic_search_engine.constants import LAST_SYNC_TIME_SHELVE, TOTAL_POSTS_SHELVE, SYNC_INTERVAL_SHELVE
 from json import dumps as to_json
 from datetime import datetime
 from time import time, sleep
-from semantic_search_engine.mattermost.mm_api import MattermostAPI
-from semantic_search_engine.mattermost.mm_details import MMDetails
-from semantic_search_engine.mattermost.mm_scheduler import MMScheduler
-from semantic_search_engine.shelves import retrieve_one, store
+from src.semantic_search_engine.mattermost.mm_api import MattermostAPI
+from src.semantic_search_engine.mattermost.mm_details import MMDetails
+from src.semantic_search_engine.mattermost.mm_scheduler import MMScheduler
+from src.semantic_search_engine.shelves import retrieve_one, store
 from . import collection
 
 sync_in_progress = False
