@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y g++ && rm -rf /var/lib/apt/lists/*
 RUN pip install -r requirements.txt
 # RUN ./install.sh
 
-CMD ["python", "./server.py"]
+CMD ["python", "./src/server.py"]
 
 ENV PORT=5555
 
