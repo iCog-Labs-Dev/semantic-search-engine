@@ -1,5 +1,8 @@
 import os, json, re
 from datetime import datetime
+import time
+
+from flask import Response
 from semantic_search_engine.slack.models import User, Channel, ChannelMember, Message
 from semantic_search_engine.constants import TEMP_SLACK_DATA_PATH
 from peewee import chunked
@@ -7,6 +10,7 @@ from . import db
 
 
 def save_users_data() -> None:
+
     """reads users' relevant info from users.json and save it to Sqlite db
     """
     # Create a User table if it doesn't exist
@@ -65,12 +69,12 @@ def save_channels_data(channel_ids: [str]) -> [dict]:
             }
             channels.append(channel_data)
             
-            channel_member_data =  {
-                'channel_id': channel['id'],
-                'user_ids': json.dumps( channel['members'] ),
-                'no_members': len( channel['members'] )
-            }
-            channel_members.append(channel_member_data)
+            for member_user_id in channel['members']:
+                channel_member =  {
+                    'channel_id': channel['id'],
+                    'user_id': member_user_id
+                }
+                channel_members.append(channel_member)
 
             saved_channels.append({
                 'id': channel['id'],
@@ -107,15 +111,17 @@ def save_channel_messages(collection, saved_channels: [dict], channel_specs: [di
             start_date = datetime.utcfromtimestamp(0).date()
             end_date = datetime.now().date()
         else:
-            start_date = datetime.utcfromtimestamp(float(spec['start_date']) / 1000).date()
-            end_date = datetime.utcfromtimestamp(float(spec['end_date']) / 1000).date()
+            start_date = datetime.utcfromtimestamp(float(spec['start_date'])).date()
+            end_date = datetime.utcfromtimestamp(float(spec['end_date'])).date()
             if start_date >= end_date: 
                 print('Start date cannot be larger that end date!')
                 continue
 
         # Get all files in the channel's folder (each file correspond to daily messages)
         all_files = os.listdir(channel_folder)
-        for file_name in all_files:
+        no_files = len(all_files)
+
+        for idx, file_name in enumerate(all_files):
 
             # Get the date from the filename and check whether it's in the range provided
             date_str = file_name.split('.json')[0]  # The files are stored as YYYY-mm-dd.json
@@ -177,6 +183,9 @@ def save_channel_messages(collection, saved_channels: [dict], channel_specs: [di
                 )
                 print('Done!')
             else: print('The channel is empty!')
+
+            yield f'data: { json.dumps({ channel_id: (idx+1)/ no_files }) }\n\n'
+
 
 # Hello <@user_id> -->  Hello user_name
 def replace_slack_handles(message: str) -> str:

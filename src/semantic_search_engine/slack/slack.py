@@ -3,11 +3,9 @@ from zipfile import ZipFile
 from semantic_search_engine.slack.save import save_channel_messages, save_channels_data, save_users_data
 from semantic_search_engine.slack.models import User, Channel, ChannelMember, Message
 from semantic_search_engine.constants import TEMP_SLACK_DATA_PATH
+from . import db, collection
 
 class Slack:
-
-    def __init__(self, collection) -> None:
-        self.collection = collection
 
     def reset_slack(self) -> None:
         """ deletes all slack data from SQLite and Chroma
@@ -19,7 +17,7 @@ class Slack:
         ChannelMember.delete().execute()
 
         # Delete all Chroma entries for Slack
-        self.collection.delete(
+        collection.delete(
             where={"source" : "sl"}
         )
 
@@ -58,7 +56,7 @@ class Slack:
                     'name': channel['name'],
                     'date_created': channel['created'],
                     'no_members': len( channel['members'] ),
-                    'access': 'pub' if public else 'pri',
+                    'access': 'public' if public else 'private',
                     'purpose': channel['purpose']['value']
                 })
         return channel_details
@@ -83,28 +81,51 @@ class Slack:
         )
 
         # Get messages for each channel from the extracted file path and save to db
-        save_channel_messages(
-            collection=self.collection,
+        # yield will respond with channel progress in real time 
+        yield from save_channel_messages(
+            collection=collection,
             saved_channels=saved_channels,
             channel_specs=channel_specs
-        )
-
-        # TODO: respond with channel progress in real time
-            # yield ...    
+        ) 
 
     @staticmethod
     def get_channel_details(channel_id: str):
-        return Channel.select().where( Channel.channel_id==channel_id ).dicts().get()
+        try:
+            return Channel.select().where( Channel.channel_id==channel_id ).dicts().get()
+        except:
+            raise Exception(f'Failed to find "Channel" with id: {channel_id}')
+
 
     @staticmethod
     def get_user_details(user_id: str):
-        return User.select().where( User.user_id==user_id ).dicts().get()
+        try:
+            return User.select().where( User.user_id==user_id ).dicts().get()
+        except:
+            raise Exception(f'Failed to find "User" with id: {user_id}')
+            
 
     @staticmethod
     def get_message_details(message_id: str):
-        return Message.select().where( Message.message_id==message_id ).dicts().get()
+        try:
+            return Message.select().where( Message.message_id==message_id ).dicts().get()
+        except:
+            raise Exception(f'Failed to find "Message" with id: {message_id}')
+            
 
-    #TODO: (Optional) Implement a function that takes a Mattermost user_id / email and
-    # returns a list of slack 'private' channels in which the user is a member of
-    # def get_user_channels(user_id / email)
-    # This can be done after the OAUTH feature is complete
+    @staticmethod
+    def get_user_channels(user_email: str) -> [str]:
+        member_channels = []
+        try:
+            with db.atomic():
+                # Get the user's id corresponding to the email
+                user_id = User.select().where( User.email==user_email ).dicts().get()['user_id']
+                # Get the channel ids corrensponding to the user_id
+                rows = ChannelMember.select(ChannelMember.channel_id).where( ChannelMember.user_id==user_id )
+                for row in rows:
+                    member_channels.append(row.channel_id)
+
+            print(member_channels)
+        except:
+            print(f'Failed to find "User Channels" with email: "{user_email}"')
+        
+        return member_channels

@@ -1,6 +1,9 @@
 import os
 from peewee import SqliteDatabase
 from semantic_search_engine.constants import TEMP_SLACK_DATA_PATH, SQLITE_PATH
+from semantic_search_engine.chroma import ChromaSingleton
+
+collection = ChromaSingleton().get_chroma_collection()
 
 os.makedirs(TEMP_SLACK_DATA_PATH, exist_ok=True)
 

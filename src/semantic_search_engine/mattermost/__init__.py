@@ -1,31 +1,41 @@
 import shelve
 import os
 from semantic_search_engine.constants import *
+from semantic_search_engine.chroma import ChromaSingleton
+from semantic_search_engine.shelves import create_default_shelve
 
-def __set_default_shelve(shelve_name: str, default_value):
-    with shelve.open( shelve_name ) as fetch_interval:
-        if not fetch_interval.get( shelve_name, False ):
-            fetch_interval[ shelve_name ] = default_value
+collection = ChromaSingleton().get_chroma_collection()
 
-# Create the shelve directory if it doesn't exist
-os.makedirs(SHELVE_PATH, exist_ok=True)
+# def __set_default_shelve(shelve_name: str, default_value):
+#     with shelve.open( shelve_name ) as my_shelve:
+#         if not my_shelve.get( shelve_name, False ):
+#             my_shelve[ shelve_name ] = default_value
+
+# # Create the shelve directory if it doesn't exist
+# os.makedirs(SHELVE_PATH, exist_ok=True)
 
 # Set default values for the following shelves if they don't exist
 
-# Default fetch_interval
-__set_default_shelve(
-    shelve_name=FETCH_INTERVAL_SHELVE,
-    default_value=DEFAULT_FETCH_INTERVAL 
+# Default sync_interval
+create_default_shelve(
+    shelve_name=SYNC_INTERVAL_SHELVE,
+    sync_interval=DEFAULT_SYNC_INTERVAL 
 )
 
-# Default last_fetch_time
-__set_default_shelve(
-    shelve_name=LAST_FETCH_TIME_SHELVE,
-    default_value=DEFAULT_LAST_FETCH_TIME 
+# Default last_sync_time
+create_default_shelve(
+    shelve_name=LAST_SYNC_TIME_SHELVE,
+    last_sync_time=DEFAULT_LAST_SYNC_TIME 
 )
 
-# Default fetch_interval
-__set_default_shelve(
-    shelve_name=CHROMA_N_RESULTS_SHELVE,
-    default_value=DEFAULT_CHROMA_N_RESULTS 
+# Default total_posts
+create_default_shelve(
+    shelve_name=TOTAL_POSTS_SHELVE,
+    total_posts=DEFAULT_TOTAL_POSTS
+)
+
+# Default personal_access_token_id
+create_default_shelve(
+    shelve_name=MM_PAT_ID_SHELVE,
+    personal_access_token_id='' 
 )
