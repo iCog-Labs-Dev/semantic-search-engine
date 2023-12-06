@@ -39,6 +39,7 @@ class SyncPosts:
     def sync_latest_posts(self):
         print(f"\n {'*'*50} \n")
 
+        global sync_percentage        
         global sync_in_progress
         sync_in_progress = True
         
@@ -116,10 +117,10 @@ class SyncPosts:
                 # yield with progress on every batch of posts fetched from MM's API
                 if self.total_posts != 0:
                     # yield f'data: { round(no_posts / (total_posts-9), 3) }\n\n'
-                    global sync_percentage
                     sync_percentage = abs( round(no_posts / (self.total_posts), 3) )
                     print('Sync Progress: ', sync_percentage )
-
+        
+        sync_percentage = 1
             # yield to indicate channel is complete
             # yield f'data: { channel["display_name"] }\n\n'
         
