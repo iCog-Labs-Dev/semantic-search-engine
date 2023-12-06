@@ -61,42 +61,6 @@ def stop_sync(loggedin_user):
 
 # ************************************************************** Stream progress in real-time (SSE) **************************************************************
 
-# ************************************************************** /is_inprogress
-@sync_bp.route('/is_inprogress')
-@login_required(admin_only=True)
-def sync_in_progress(loggedin_user):
-    def in_progress():
-        start_time = time()
-        while True:
-            sync_in_progress = is_sync_inprogress()
-            global prev_in_progress
-            if sync_in_progress != prev_in_progress:
-                prev_in_progress = sync_in_progress
-                yield f"data: { sync_in_progress }\n\n"
-            elif time() > start_time + timeout:
-                break
-            
-            sleep(1)
-    return Response(in_progress(), content_type='text/event-stream')
-
-# ************************************************************** /is_started
-@sync_bp.route('/is_started')
-@login_required(admin_only=True)
-def is_sync_started(loggedin_user):
-    def is_started():
-        start_time = time()
-        while True:
-            # yield f"data: {time.strftime('%H:%M:%S')}\n\n"
-            global prev_is_syncing
-            if mattermost.is_syncing() != prev_is_syncing:
-                prev_is_syncing = mattermost.is_syncing()
-                yield f"data: { mattermost.is_syncing() }\n\n"
-            elif time() > start_time + timeout:
-                break
-
-            sleep(3)
-    return Response(is_started(), content_type='text/event-stream')
-
 # ************************************************************** /sync_percentage
 @sync_bp.route('/sync_percentage')
 @login_required(admin_only=True)
@@ -116,3 +80,44 @@ def get_sync_progress(loggedin_user):
             
             sleep(0.5)
     return Response(sync_progress(), content_type='text/event-stream')
+
+# ************************************************************** /is_started
+@sync_bp.route('/is_started')
+@login_required(admin_only=True)
+def is_sync_started(loggedin_user):
+    def is_started():
+        yield f"data: { mattermost.is_syncing() }\n\n"
+
+        start_time = time()
+        while True:
+            global prev_is_syncing
+            if True: # mattermost.is_syncing() != prev_is_syncing:
+                prev_is_syncing = mattermost.is_syncing()
+                yield f"data: { mattermost.is_syncing() }\n\n"
+
+            if time() > start_time + timeout:
+                break
+
+            sleep(3)
+    return Response(is_started(), content_type='text/event-stream')
+
+# ************************************************************** /is_inprogress
+@sync_bp.route('/is_inprogress')
+@login_required(admin_only=True)
+def sync_in_progress(loggedin_user):
+    def in_progress():
+        yield f"data: { is_sync_inprogress() }\n\n"
+
+        start_time = time()
+        while True:
+            sync_in_progress = is_sync_inprogress()
+            global prev_in_progress
+            if True: # sync_in_progress != prev_in_progress:
+                prev_in_progress = sync_in_progress
+                yield f"data: { sync_in_progress }\n\n"
+                
+            if time() > start_time + timeout:
+                break
+            
+            sleep(3)
+    return Response(in_progress(), content_type='text/event-stream')
