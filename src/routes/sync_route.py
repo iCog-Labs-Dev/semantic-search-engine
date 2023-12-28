@@ -66,7 +66,7 @@ def stop_sync(loggedin_user):
 @login_required(admin_only=True)
 def get_sync_progress(loggedin_user):
     def sync_progress():
-        start_time = time()
+        # start_time = time()
         while True:
             sync_percentage = get_sync_percentage()
             global prev_sync_progress
@@ -75,8 +75,8 @@ def get_sync_progress(loggedin_user):
                 yield f"data: { sync_percentage }\n\n"
             elif mattermost.is_syncing() and not is_sync_inprogress():
                 break
-            elif time() > start_time + timeout:
-                break
+            # elif time() > start_time + timeout:
+            #     break
             
             sleep(0.5)
     return Response(sync_progress(), content_type='text/event-stream')
