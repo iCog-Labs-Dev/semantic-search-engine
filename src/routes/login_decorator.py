@@ -21,6 +21,18 @@ def login_required(admin_only: bool):
                         'name': '',
                         'email': ''
                     } }, *args, **kwargs)
+
+            # TODO: Temp NO AUTH
+            ############################
+            from src.semantic_search_engine.constants import PAT_SHELVE
+            pat = retrieve_one(
+                shelve_name=PAT_SHELVE,
+                key='personal_access_token'
+            )
+            if not pat:
+                return Response(to_json({ 'message' : 'Personal access token not set!' }), status=400, mimetype='application/json')
+            ############################
+                  
             cookies = dict(request.cookies)
             auth_token = cookies.get('MMAUTHTOKEN')
             user_id = cookies.get('MMUSERID')
