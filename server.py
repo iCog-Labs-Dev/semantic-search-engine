@@ -28,9 +28,9 @@ CORS(app=app,
 # app.config['SESSION_COOKIE_SECURE'] = True
 
 # TODO: Temp NO AUTH
-from src.semantic_search_engine.constants import SHELVE_PATH
+from src.semantic_search_engine.constants import SHELVE_PATH, PAT_SHELVE
 create_default_shelve(
-    shelve_name=os.path.join(SHELVE_PATH, "pat"),
+    shelve_name=PAT_SHELVE,
     personal_access_token=''
 )
 
@@ -51,4 +51,5 @@ port_no = os.environ.get('PORT', 5555)
 print(f"Server running on port {port_no}...")
 if __name__ == '__main__':
     app.run(port=int(port_no), debug=True, host="0.0.0.0")
-
+else:
+    gunicorn_app = app
