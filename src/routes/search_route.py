@@ -64,7 +64,9 @@ from src.semantic_search_engine.slack.models import User,Message, ChannelMember,
 
 # =========== Test Chroma ===========
 # TODO: remove this endpoint
+from src.semantic_search_engine.constants import PAT_SHELVE
 @search_bp.route('/db/<db>', methods=['GET', 'POST'])
+@login_required(admin_only=False)
 def chroma_route(db):
     if db == 'chroma':
         query = request.json['query'] or 'Hello'
@@ -72,7 +74,7 @@ def chroma_route(db):
         source = request.json['source'] or 'sl'
         user_id = request.json['user_id']
         pat = retrieve_one(
-            shelve_name='pat',
+            shelve_name=PAT_SHELVE,
             key='personal_access_token'
         )
         channels_list = MM_Api(access_token=pat).get_user_channels(user_id=user_id) or [''] if source == 'mm' else ['']

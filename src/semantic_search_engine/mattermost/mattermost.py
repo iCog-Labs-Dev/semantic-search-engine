@@ -36,8 +36,9 @@ class Mattermost:
             return
         
         # TODO: Temp NO AUTH
+        from src.semantic_search_engine.constants import PAT_SHELVE
         personal_access_token = retrieve_one(
-            shelve_name='pat',
+            shelve_name=PAT_SHELVE,
             key='personal_access_token'
         )
 

@@ -38,3 +38,5 @@ SYNC_INTERVAL_SHELVE = os.path.join(SHELVE_PATH, "sync_interval")
 TOTAL_POSTS_SHELVE = os.path.join(SHELVE_PATH, "total_posts")
 MM_PAT_ID_SHELVE = os.path.join(SHELVE_PATH, "personal_access_token_id")
 CHROMA_SHELVE = os.path.join(SHELVE_PATH, "chroma_shelve")
+# TODO: Temp NO AUTH
+PAT_SHELVE = os.path.join(SHELVE_PATH, "pat")

@@ -123,6 +123,7 @@ def reset_all(loggedin_user):
 
 # TODO: Temp NO AUTH
 from src.semantic_search_engine.shelves import store, retrieve_one
+from src.semantic_search_engine.constants import PAT_SHELVE
 # TODO: Temp NO AUTH
 @settings_bp.route('/set_pat', methods=['POST'])
 def set_pat():
@@ -131,7 +132,7 @@ def set_pat():
 
         pat =  body.get("personal_access_token", 'False')
         store(
-            shelve_name='pat',
+            shelve_name=PAT_SHELVE,
             personal_access_token=pat
         )
         
@@ -148,7 +149,7 @@ def set_pat():
 def get_pat():
     try:
         pat = retrieve_one(
-            shelve_name='pat',
+            shelve_name=PAT_SHELVE,
             key='personal_access_token'
         )
         return Response(to_json( {'personal_access_token': pat} ), status=200, mimetype='application/json')
