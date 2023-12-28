@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 wsgi_app = "server:app"
-workers = 2
+workers = 1
 worker_class = "gevent"
 timeout = 3600
 graceful_timeout = 60
