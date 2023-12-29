@@ -9,13 +9,13 @@ This repository houses an API designed for semantically searching exported Slack
     ```
 
 - **Start the Server:**
-    1. *Using Gunicorn*
-    ```bash
-    gunicorn -c gunicorn.conf.py
-    ```
-    2. *Using Flask*
+    1. *Using Flask*
     ```bash
     python ./server.py
+    ```
+    2. *Using Gunicorn*
+    ```bash
+    gunicorn -c gunicorn.conf.py
     ```
 
 - **Or Use Docker (Download and Run):**
