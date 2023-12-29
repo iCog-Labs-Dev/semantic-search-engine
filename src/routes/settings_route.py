@@ -145,16 +145,17 @@ def set_pat():
         }), status=500, mimetype='application/json')
 
 # TODO: Temp NO AUTH
-@settings_bp.route('/get_pat', methods=['GET'])
-def get_pat():
-    try:
-        pat = retrieve_one(
-            shelve_name=PAT_SHELVE,
-            key='personal_access_token'
-        )
-        return Response(to_json( {'personal_access_token': pat} ), status=200, mimetype='application/json')
-    except Exception as err:
-        return Response(to_json({
-            'message': 'Something went wrong while resetting!',
-            'log': str( err )
-        }), status=500, mimetype='application/json')
+# TODO: Remove this endpoint
+# @settings_bp.route('/get_pat', methods=['GET'])
+# def get_pat():
+#     try:
+#         pat = retrieve_one(
+#             shelve_name=PAT_SHELVE,
+#             key='personal_access_token'
+#         )
+#         return Response(to_json( {'personal_access_token': pat} ), status=200, mimetype='application/json')
+#     except Exception as err:
+#         return Response(to_json({
+#             'message': 'Something went wrong while resetting!',
+#             'log': str( err )
+#         }), status=500, mimetype='application/json')
