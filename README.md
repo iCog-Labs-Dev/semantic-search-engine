@@ -1,69 +1,54 @@
-# Semaintic Search Engine
+# Semantic Search Engine
 
-This repo contains an API for semantically searching exported slack data. The API has the following endpoints:
->**Public URL:** https://semantic-search-79bp.onrender.com
->**Local URL:** https://localhost:5000/
->**Note:** All `GET` requests show the structure of the `POST` requests you should be sending.
--  **Root endpoint** `/` : Get some documentation about the endpoints
--  **Pull endpoint** `/pull` : Pull / clone the repo containing the exported slack data
--  **Upsert endpoint** `/upsert` : Upsert exported slack data to the vector database
--  **Delete endpoint** `/delete_all` : Delete the ChromaDB collection
--  **Start endpoint** `/togetherai/start` : Start running the togeher.ai model
--  **Search endpoint** `/search` : Semantically search the exported slack messages
--  **Stop endpoint** `/togetherai/stop` : Stop running the togeher.ai model
+This repository houses an API designed for semantically searching exported Slack data. Follow these straightforward steps to run the Semantic Search Engine API.
 
+### Getting Started
+- **Clone the Repository:**
+    ```bash
+    git clone https://github.com/iCog-Labs-Dev/semantic-search-engine.git
+    ```
 
-### It's best to follow these steps if you are running the API for the first time.
->**Prerequisite:** You should have your own together.ai API key
+- **Start the Server:**
+    Using Gunicorn
+    ```bash
+    gunicorn -c gunicorn.conf.py
+    ```
+    Using Flask
+    ```bash
+    python ./server.py
+    ```
 
-#### 1. Installing required dependencies
-* Run the following commands on the root directory:
-```sh
-./install.sh && python3 app.py
-```
-#### 2. Making sure server is running
-* **URL:** `/`
-* **Method:** `GET`
-* **Response:** `Hi ✋`
+- **Or Use Docker (Download and Run):**
+    ```bash
+    docker pull tollan/semantic-search-engine
+    docker run -p 8080:5555 tollan/semantic-search-engine
+    ```
 
-#### 3. Pulling Slack data from GitHub
-* **URL:** `/pull`
-* **Method:** `POST`
-```sh
-{
-	"repo_url": "https://github.com/iCog-Labs-Dev/slack-export-data.git"
-}
-```
-#### 4. Upserting Slack data to the vector database
-* **URL:** `/upsert`
-* **Method:** `POST`
-```sh
-{
-	"channel_names": "['random', 'test', 'general']"
-}
-```
-#### 5. Starting the model on together.ai
-* **URL:** `/togetherai/start`
-* **Method:** `POST`
-```sh
-{
-	"together_api_key": "---------------------------"
-}
-```
-#### 6. Prompting the semantic-search-engine
-* **URL:** `/search`
-* **Method:** `POST`
-```sh
-{
-	"query" : "What did someone say about something?",
-	"together_api_key": "---------------------------"
-}
-```
-#### 7. Stopping the model on together.ai
-* **URL:** `/togetherai/stop`
-* **Method:** `POST`
-```sh
-{
-	"together_api_key": "---------------------------"
-}
-```
+### API Endpoints
+
+- **Ping Server:**
+    - `/` : Ping the server to check its status.
+
+- **Get Server Settings:**
+    - `/root/get` : Retrieve the server settings.
+
+- **Semantic Search:**
+    - `/search/*` : Search for messages semantically.
+
+- **Settings:**
+    - `/settings/sync_interval` : Set the sync interval to fetch new messages from Mattermost.
+    - `/settings/chroma` : Set the number of results returned by Chroma or the maximum distance of the query to the messages in Chroma.
+    - `/settings/reset` : Delete all Slack or Mattermost messages from Chroma DB.
+    - `/settings/set_pat` : Set the personal access token for the admin user.
+
+- **Slack Data Handling:**
+    - `/slack/upload_zip` : Upload a zipped file of exported Slack messages.
+    - `/slack/store_data` : Extract and store messages from the uploaded Slack zip file.
+    - `/slack/store_data_stream` : Send progress of storing all Slack messages.
+
+- **Sync Process:**
+    - `/sync/start` : Start syncing Mattermost messages to Chroma.
+    - `/sync/stop` : Stop the syncing process.
+    - `/sync/sync_percentage` : Get the progress of the ongoing sync process.
+    - `/sync/is_started` : Check whether sync has already started.
+    - `/sync/is_inprogress` : Check whether the sync process is running or not.
