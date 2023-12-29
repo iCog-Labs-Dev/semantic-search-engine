@@ -13,9 +13,9 @@ ENV MM_URL="http://localhost:8065"
 ENV TOGETHER_API_KEY="ac17a88fb15afc19f632fc58d39d177814f3ead1d013f7adc9bce9f3ccf33580"
 ENV APP_SECRET_KEY="somerandomstring"
 
-# CMD ["python", "./server.py"]
+CMD ["python", "./server.py"]
 # RUN cd ./src/
-CMD ["gunicorn", "-c", "gunicorn.conf.py"]
+# CMD ["gunicorn", "-c", "gunicorn.conf.py"]
 
 ENV PORT=5555
 
