@@ -5,7 +5,7 @@ This repository houses an API designed for semantically searching exported Slack
 ### Getting Started
 - **Clone the Repository:**
     ```bash
-    git clone https://github.com/iCog-Labs-Dev/semantic-search-engine.git
+    git clone https://github.com/iCog-Labs-Dev/semantic-search-engine.git && git checkout deploy-no-auth
     ```
 
 - **Start the Server:**
