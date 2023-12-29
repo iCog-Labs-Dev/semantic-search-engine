@@ -9,11 +9,11 @@ This repository houses an API designed for semantically searching exported Slack
     ```
 
 - **Start the Server:**
-    Using Gunicorn
+    1. *Using Gunicorn*
     ```bash
     gunicorn -c gunicorn.conf.py
     ```
-    Using Flask
+    2. *Using Flask*
     ```bash
     python ./server.py
     ```
