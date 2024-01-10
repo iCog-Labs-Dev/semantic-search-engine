@@ -5,24 +5,36 @@ This repository houses an API designed for semantically searching exported Slack
 ### Getting Started
 - **Clone the Repository:**
     ```bash
-    git clone https://github.com/iCog-Labs-Dev/semantic-search-engine.git && git checkout deploy-no-auth
+    git clone https://github.com/iCog-Labs-Dev/semantic-search-engine.git && \
+    cd semantic-search-engine && \
+    git checkout deploy-no-auth
+    ```
+
+- **Install requred packages:**
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+- **Setup the environment variables:**
+    ```bash
+    cp .env.example .env
     ```
 
 - **Start the Server:**
-    1. *Using Flask*
+    <!-- 1. *Using Flask* -->
     ```bash
     python ./server.py
     ```
-    2. *Using Gunicorn*
+    <!-- 2. *Using Gunicorn*
     ```bash
-    gunicorn -c gunicorn.conf.py
+    gunicorn -c gunicorn.conf.py -->
     ```
 
-- **Or Use Docker (Download and Run):**
+<!-- - **Or Use Docker (Download and Run):**
     ```bash
     docker pull tollan/semantic-search-engine
     docker run -p 8080:5555 tollan/semantic-search-engine
-    ```
+    ``` -->
 
 ### API Endpoints
 
