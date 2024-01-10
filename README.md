@@ -7,6 +7,11 @@ This repository houses an API designed for semantically searching exported Slack
     ```bash
     git clone https://github.com/iCog-Labs-Dev/semantic-search-engine.git && git checkout deploy-no-auth
     ```
+    
+- **Setup the environment variables:**
+    ```bash
+    cp .env.example .env
+    ```
 
 - **Start the Server:**
     1. *Using Flask*
